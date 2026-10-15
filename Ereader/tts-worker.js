@@ -57,7 +57,7 @@ async function load(wantGpu, voice) {
     if (used.device === "webgpu") await tts.generate("It was a bright cold day in April, and the clocks were striking thirteen.", { voice: voice || "af_heart" });
     warmMs = Math.round(performance.now() - t0);
   } catch (err) { /* a failed warm-up is not fatal */ }
-  postMessage({ type: "ready", device: used.device, dtype: used.dtype, warmMs });
+  postMessage({ type: "ready", device: used.device, dtype: used.dtype, warmMs, threads: self.crossOriginIsolated ? Math.min(4, Math.max(1, Math.floor((navigator.hardwareConcurrency || 2) / 2))) : 1 });
 }
 
 async function pump() {

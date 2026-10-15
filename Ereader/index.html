@@ -680,12 +680,24 @@ function userNav(){if(V.playing&&V.cur&&!V.detached)setDetached(true)}
 function voicePageChanged(){if(V.detached&&V.cur&&pageOf(V.cur)===page)setDetached(false)}
 $("vFollow").onclick=()=>{setDetached(false);followPage()};
 
+/* Multi-threaded CPU voice needs cross-origin isolation; a tiny service worker provides it when the page is hosted statically */
+(function(){
+  try{
+    if(window.crossOriginIsolated||!("serviceWorker" in navigator)||!window.isSecureContext||window.top!==window)return;
+    if(!("credentialless" in HTMLIFrameElement.prototype))return;          // Safari: not supported, the voice stays single-threaded
+    if(store.get("marginalia.coiTried",0)>=2)return;
+    const n=store.get("marginalia.coiTried",0)+1;
+    navigator.serviceWorker.register("coi-serviceworker.js").then(()=>navigator.serviceWorker.ready).then(()=>{
+      if(!window.crossOriginIsolated){store.set("marginalia.coiTried",n);location.reload()}     // one reload so the page is served with the isolation headers
+    }).catch(()=>{});
+  }catch(e){}
+})();
 /* Kokoro (natural voice) through a worker */
 const KK_KEEP=80;                                  // finished sentences kept for instant rewind and replay
 function kkInfo(){
   let t="Reading aloud with the natural voice";
-  if(KK.device)t+=" ("+(KK.device==="webgpu"?"GPU":"CPU")+(KK.rtf?", "+KK.rtf.toFixed(1)+"\u00d7 real time":"")+")";
-  if(KK.rtf>1.2&&KK.n>=2)t+=". Slower than speech: try the GPU setting or the browser voice";
+  if(KK.device)t+=" ("+(KK.device==="webgpu"?"GPU":"CPU"+(KK.threads>1?", "+KK.threads+" threads":", 1 thread"))+(KK.rtf?", "+KK.rtf.toFixed(1)+"\u00d7 real time":"")+")";
+  if(KK.rtf>1.2&&KK.n>=2)t+=". Too slow for this device. In the Aa panel, set Voice to Browser";
   return t;
 }
 function kkLoad(){
@@ -698,7 +710,7 @@ function kkLoad(){
       const m=e.data;
       if(m.type==="progress")vStat("Downloading natural voice\u2026 "+m.pct+"%");
       else if(m.type==="status")vStat(m.text);
-      else if(m.type==="ready"){KK.device=m.device;KK.dtype=m.dtype;KK.warm=m.warmMs;res(m);if(V.open&&!V.playing)vStat("Natural voice ready. Press play.");if(V.playing&&V.eng==="kk")kkPrefetch()}
+      else if(m.type==="ready"){KK.device=m.device;KK.dtype=m.dtype;KK.warm=m.warmMs;KK.threads=m.threads||1;res(m);if(V.open&&!V.playing)vStat("Natural voice ready. Press play.");if(V.playing&&V.eng==="kk")kkPrefetch()}
       else if(m.type==="start"){const p=KK.pending.get(m.id);if(p)p.started=true}
       else if(m.type==="skipped"){const p=KK.pending.get(m.id);if(p){KK.pending.delete(m.id);p.rej(new Error("skipped"))}}
       else if(m.type==="audio"){
