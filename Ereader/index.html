@@ -1,0 +1,757 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Marginalia Reader</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=Instrument+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap">
+<style>
+/* Layout: library shelf of spines/cards on top; full-bleed reader with sticky toolbar and chapter drawer. */
+:root{
+  --bg:#F2F4F0; --surface:#FFFFFF; --fg:#1B2230; --muted:#5E6A72; --line:#D5DAD3; --accent:#1F5F5B; --accent-fg:#FFFFFF; --mark:#E4EFEA; --hl:#CDE4DC;
+  --font-display:"Fraunces",Georgia,serif; --font-read:"Spectral",Georgia,serif; --font-ui:"Instrument Sans",system-ui,sans-serif;
+  --size:20px; --measure:34em; --lh:1.65; --read:var(--font-read);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161C;--surface:#1A2029;--fg:#DCE0D8;--muted:#8E9AA0;--line:#2B343E;--accent:#7CBDB4;--accent-fg:#0E1A19;--mark:#1F2B2B;--hl:#2E4A45;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12161C;--surface:#1A2029;--fg:#DCE0D8;--muted:#8E9AA0;--line:#2B343E;--accent:#7CBDB4;--accent-fg:#0E1A19;--mark:#1F2B2B;--hl:#2E4A45;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:15px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:68rem;margin:0 auto}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:10px 0;flex-wrap:wrap}
+.brand{font-family:var(--font-display);font-weight:700;font-size:1.25rem;letter-spacing:-.01em;margin-right:auto;background:none;border:0;padding:0}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 12px;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.title-line{min-width:0;flex:1 1 12rem;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;color:var(--muted)}
+/* library */
+.lib{padding-block:28px 64px;display:grid;gap:30px}
+.lib h1{font-family:var(--font-display);font-size:clamp(1.9rem,5vw,2.8rem);line-height:1.1;margin:0;text-wrap:balance;max-width:20ch}
+.lib p.lede{max-width:60ch;color:var(--muted);line-height:1.55;margin:8px 0 0}
+.find{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.find input[type=text]{flex:1 1 16rem;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 14px;font-size:1rem}
+.sec{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 12px;font-weight:600}
+.shelf,.cat{display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:12px}
+.book{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:4px;text-align:left;min-width:0;position:relative;align-content:start;width:100%}
+.book:hover{border-color:var(--accent)}
+.book .t{font-family:var(--font-display);font-weight:700;font-size:1.05rem;line-height:1.25;text-wrap:balance;overflow-wrap:anywhere}
+.book .a{color:var(--muted)}
+.bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.meta{font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.book.loading{opacity:.6;pointer-events:none}
+.msg{min-height:1.2em;font-size:.9rem;color:var(--accent);margin:0}
+.msg.err{color:#B3402F}
+details.own{color:var(--muted);font-size:.9rem}
+details.own summary{cursor:pointer}
+details.own .drop{margin-top:10px;border:1.5px dashed var(--line);border-radius:10px;padding:14px;line-height:1.5}
+details.own .drop.over{border-color:var(--accent);background:var(--mark)}
+a{color:var(--accent)}
+/* reader: fixed-height stage, text flows into columns, one page (or spread) at a time */
+html.reading{overflow:hidden}
+.reader{display:grid;grid-template-columns:minmax(0,1fr)}
+#stage{position:relative;overflow:hidden;display:flex;justify-content:center;user-select:none;-webkit-user-select:none}
+#view{overflow:hidden;margin-block:18px}
+#flow{height:100%;column-fill:auto;font-family:var(--read);font-size:var(--size);line-height:var(--lh);hyphens:auto;overflow-wrap:break-word;text-align:left;will-change:transform}
+@media (prefers-reduced-motion:no-preference){#flow{transition:transform .22s ease}}
+#flow .ch-kicker{font-family:var(--font-ui);font-size:.62em;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 .6em;break-after:avoid}
+#flow h2{font-family:var(--font-display);font-size:1.7em;line-height:1.15;margin:0 0 1em;text-wrap:balance;font-weight:700;break-after:avoid}
+#flow p{margin:0;text-indent:1.4em;orphans:2;widows:2}
+#flow p.first,#flow p.sb,#flow h2+p{text-indent:0}
+#flow p.first::first-letter{font-family:var(--font-display);float:left;font-size:3.3em;line-height:.85;padding:.06em .08em 0 0;color:var(--accent);font-weight:700}
+#flow p.verse{white-space:pre-line;padding-left:1.5em;font-style:italic;text-indent:0;margin:.8em 0}
+#flow em{font-style:italic}
+#flow .s{border-radius:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+#flow .s.hl{background:var(--hl)}
+#flow.nohl .s.hl{background:none}
+#flow hr{border:0;text-align:center;margin:1em 0;color:var(--muted)}
+#flow hr::before{content:"\2022  \2022  \2022";letter-spacing:.4em}
+.prog{border-top:1px solid var(--line);padding:8px 0 4px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.prog .mid{display:grid;gap:5px;min-width:0}
+.prog .row2{display:flex;justify-content:space-between;gap:10px;min-width:0}
+.prog .row2 span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.prog .btn{padding:6px 12px;font-size:1rem;line-height:1}
+.prog .btn:disabled{opacity:.35;cursor:default}
+.voice{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding:8px 0;min-width:0}
+.voice .btn{padding:6px 10px;line-height:0;display:inline-grid;place-items:center;min-width:2.4rem;min-height:2.2rem}
+.voice .btn svg{width:18px;height:18px;fill:currentColor;display:block}
+.voice .btn.main{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.voice .stat{flex:1 1 0;min-width:0;color:var(--muted);font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.voice .btn.txt{line-height:1.2;font-size:.85rem}
+@media (max-width:520px){.prog .row2{flex-wrap:wrap;gap:2px 10px}.prog .row2 span{white-space:normal;overflow:visible}}
+.ctl select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 8px;width:100%}
+.note{font-size:.8rem;color:var(--muted);line-height:1.45;margin:0}
+.drawer,.sheet{position:fixed;top:0;bottom:0;z-index:20;background:var(--surface);border:1px solid var(--line);padding:16px;overflow:auto;width:min(22rem,88vw);padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+.drawer{left:0;border-width:0 1px 0 0;padding-left:max(16px,env(safe-area-inset-left,0px))}
+.sheet{right:0;border-width:0 0 0 1px;padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px;align-content:start}
+.drawer h3,.sheet h3{margin:0 0 10px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.toc{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.toc button{width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:6px;line-height:1.3;overflow-wrap:anywhere}
+.toc button:hover{background:var(--mark)}
+.toc button[aria-current=true]{background:var(--mark);color:var(--accent);font-weight:600}
+.scrim{position:fixed;inset:0;background:rgba(10,14,18,.4);z-index:10}
+.ctl{display:grid;gap:6px}
+.ctl label{font-size:.85rem;color:var(--muted)}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;background:none;border:0;padding:7px 4px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-fg)}
+@media (prefers-reduced-motion:no-preference){.book{transition:border-color .15s}}
+</style>
+
+<header class="top"><div class="wrap" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:100%">
+  <button class="brand" id="home" type="button">Marginalia</button>
+  <span class="title-line" id="tline" hidden></span>
+  <button class="btn" id="listenBtn" type="button" aria-pressed="false" hidden>Listen</button>
+  <button class="btn" id="tocBtn" type="button" hidden>Contents</button>
+  <button class="btn" id="setBtn" type="button">Aa</button>
+</div></header>
+
+<main class="wrap">
+<section class="lib" id="lib">
+  <div>
+    <h1>Read Project Gutenberg, one page at a time</h1>
+    <p class="lede">Type a Gutenberg ID or pick a title. The book opens straight away, split into chapters and pages, and the reader remembers where you stopped.</p>
+  </div>
+  <div>
+    <form class="find" id="findForm">
+      <input type="text" id="q" placeholder="Search title or author, or type an ID like 1342" aria-label="Search the library or enter a Gutenberg ID" autocomplete="off">
+      <button class="btn primary" type="submit">Open</button>
+    </form>
+    <p class="msg" id="msg" role="status"></p>
+  </div>
+  <div id="contWrap" hidden>
+    <h2 class="sec">Continue reading</h2>
+    <div class="shelf" id="shelf"></div>
+  </div>
+  <div>
+    <h2 class="sec" id="catTitle">Library</h2>
+    <div class="cat" id="cat"></div>
+  </div>
+  <details class="own">
+    <summary>Need a book that is not in the library?</summary>
+    <div class="drop" id="drop">Save its Plain Text, HTML or EPUB file from <a href="https://www.gutenberg.org" target="_blank" rel="noopener">gutenberg.org</a>, then drop it here.<br><input type="file" id="file" accept=".txt,.html,.htm,.epub,text/plain,text/html,application/epub+zip" multiple style="margin-top:8px;max-width:100%"></div>
+  </details>
+</section>
+
+<section class="reader" id="reader" hidden>
+  <div id="stage"><div id="view"><div id="flow"></div></div></div>
+  <div id="foot">
+  <div class="voice" id="voice" hidden>
+    <button class="btn" id="vPrev" type="button" aria-label="Previous sentence"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+    <button class="btn main" id="vPlay" type="button" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+    <button class="btn" id="vNext" type="button" aria-label="Next sentence"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+    <span class="stat" id="vStat" role="status">Press play to start reading aloud from this page.</span>
+    <button class="btn txt" id="vFollow" type="button" hidden>Back to voice</button>
+  </div>
+  <div class="prog" id="prog">
+    <button class="btn" id="prev" type="button" aria-label="Previous page">&#8249;</button>
+    <div class="mid"><div class="bar"><i id="pbar" style="width:0"></i></div>
+      <div class="row2"><span id="chl"></span><span id="pgl"></span><span id="left"></span></div></div>
+    <button class="btn" id="next" type="button" aria-label="Next page">&#8250;</button>
+  </div>
+  </div>
+</section>
+</main>
+
+<div class="scrim" id="scrim" hidden></div>
+<nav class="drawer" id="drawer" hidden aria-label="Contents"><h3>Contents</h3><ul class="toc" id="toc"></ul></nav>
+<aside class="sheet" id="sheet" hidden aria-label="Reading settings">
+  <h3>Reading</h3>
+  <div class="ctl"><label>Text size</label><div class="seg" id="sSize"><button data-v="-1" type="button">A&minus;</button><button data-v="1" type="button">A+</button></div></div>
+  <div class="ctl"><label>Typeface</label><div class="seg" id="sFont"><button data-v="serif" type="button">Serif</button><button data-v="sans" type="button">Sans</button></div></div>
+  <div class="ctl"><label>Line width</label><div class="seg" id="sMeasure"><button data-v="28" type="button">Narrow</button><button data-v="34" type="button">Medium</button><button data-v="42" type="button">Wide</button></div></div>
+  <div class="ctl"><label>Line spacing</label><div class="seg" id="sLh"><button data-v="1.5" type="button">Tight</button><button data-v="1.65" type="button">Normal</button><button data-v="1.85" type="button">Loose</button></div></div>
+  <h3 style="margin-top:6px">Voice</h3>
+  <div class="ctl"><label>Voice engine</label><div class="seg" id="sEngine"><button data-v="natural" type="button">Natural</button><button data-v="browser" type="button">Browser</button></div></div>
+  <div class="ctl"><label for="vSel">Voice</label><select id="vSel"></select></div>
+  <div class="ctl"><label>Speed</label><div class="seg" id="sSpeed"><button data-v="0.8" type="button">0.8&times;</button><button data-v="1" type="button">1&times;</button><button data-v="1.25" type="button">1.25&times;</button><button data-v="1.5" type="button">1.5&times;</button></div></div>
+  <div class="ctl"><label>Highlight spoken sentence</label><div class="seg" id="sHl"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
+  <div class="ctl"><label>Natural voice on GPU</label><div class="seg" id="sGpu"><button data-v="false" type="button">Off</button><button data-v="true" type="button">On</button></div></div>
+  <p class="note">The natural voice is a one-time download kept in your browser: about 90 MB, or about 330 MB with GPU, which is much faster. Each voice also fetches a small file the first time you use it. The browser voice needs no download.</p>
+  <h3 style="margin-top:6px">Appearance</h3>
+  <div class="ctl"><label>Theme</label><div class="seg" id="sTheme"><button data-v="auto" type="button">Auto</button><button data-v="light" type="button">Light</button><button data-v="dark" type="button">Dark</button></div></div>
+</aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+/* ---------- storage: IndexedDB with in-memory fallback ---------- */
+const mem=new Map();let dbp=null;
+function db(){if(dbp)return dbp;dbp=new Promise(res=>{try{const r=indexedDB.open("marginalia",1);r.onupgradeneeded=()=>r.result.createObjectStore("books",{keyPath:"id"});r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)}catch(e){res(null)}});return dbp}
+async function tx(mode,fn){const d=await db();if(!d)return null;return new Promise(res=>{try{const t=d.transaction("books",mode);const r=fn(t.objectStore("books"));t.oncomplete=()=>res(r&&r.result!==undefined?r.result:true);t.onerror=()=>res(null)}catch(e){res(null)}})}
+async function allBooks(){const r=await tx("readonly",s=>s.getAll());return r&&r!==true?r:[...mem.values()]}
+async function putBook(b){mem.set(b.id,b);await tx("readwrite",s=>s.put(b))}
+async function delBook(id){mem.delete(id);await tx("readwrite",s=>s.delete(id))}
+
+/* ---------- parsing ---------- */
+const ROMAN="(?:[IVXLCDM]+)";
+const CH=new RegExp("^\\s*((?:CHAPTER|Chapter|BOOK|Book|PART|Part|LETTER|Letter|ACT|Act|CANTO|Canto|STAVE|Stave)\\s+(?:"+ROMAN+"|\\d+|[A-Z][a-z]+(?:[- ][a-z]+)?)\\b[.:]?.{0,70}|"+ROMAN+"\\.\\s+[A-Z0-9][A-Z0-9 ,.'\\-;:!?]{3,70}|"+ROMAN+"\\.?|\\d{1,3}\\.?|PREFACE|Preface|INTRODUCTION|Introduction|EPILOGUE|Epilogue|PROLOGUE|Prologue|CONTENTS|Contents)\\s*$");
+const words=s=>(s.match(/\S+/g)||[]).length;
+function stripPG(t){
+  t=t.replace(/^﻿/,"").replace(/\r\n?/g,"\n");
+  const m={};
+  const hm=/^(Title|Author|Release date|Language):\s*(.+)$/gim;let x;
+  const head=t.slice(0,6000);
+  while((x=hm.exec(head)))m[x[1].toLowerCase()]=m[x[1].toLowerCase()]||x[2].trim();
+  const s=t.search(/\*\*\*\s*START OF (?:THE|THIS) PROJECT GUTENBERG[^\n]*\n/i);
+  if(s>=0){const e=t.indexOf("\n",s);t=t.slice(e+1)}
+  const en=t.search(/\*\*\*\s*END OF (?:THE|THIS) PROJECT GUTENBERG/i);
+  if(en>=0)t=t.slice(0,en);
+  return {text:t,meta:m};
+}
+function parseText(raw,name){
+  const {text,meta}=stripPG(raw);
+  const blocks=text.split(/\n[ \t]*\n/).map(b=>b.replace(/^\n+/,"").replace(/\s+$/,"")).filter(b=>b.trim());
+  const chapters=[];let cur={title:"Beginning",paras:[],front:true};
+  const push=()=>{if(cur.paras.length||!cur.front)chapters.push(cur)};
+  for(let i=0;i<blocks.length;i++){
+    const b=blocks[i],lines=b.split("\n").map(l=>l.trim());
+    const one=lines.join(" ").replace(/\s+/g," ");
+    if(lines.length<=2&&one.length<90&&CH.test(lines[0])&&!/^\d{1,3}\.?$/.test(one)&&!/^CONTENTS$/i.test(one)){
+      let title=one;
+      if(cur.paras.length||!cur.front)push();
+      cur={title,paras:[]};continue;
+    }
+    if(/^(?:\*\s*){3,}$/.test(one)||/^[-_=]{4,}$/.test(one)){cur.paras.push({hr:1});continue}
+    const avg=lines.reduce((a,l)=>a+l.length,0)/lines.length;
+    if(lines.length>=2&&lines.length<=14&&avg<38&&lines.every(l=>l.length<64)){cur.paras.push({v:lines.join("\n")})}
+    else cur.paras.push(one);
+  }
+  push();
+  let ch=chapters.filter(c=>c.paras.length);
+  if(!ch.length)ch=[{title:"Text",paras:[text.trim()]}];
+  if(ch.length===1&&ch[0].paras.length>60){ // no headings found: split into sections
+    const ps=ch[0].paras,out=[];for(let i=0;i<ps.length;i+=40)out.push({title:"Section "+(out.length+1),paras:ps.slice(i,i+40)});ch=out;
+  }
+  return finish(ch,meta,name);
+}
+function htmlToChapters(doc){
+  const out=[];let cur={title:"",paras:[]};
+  const body=doc.body||doc;
+  body.querySelectorAll("script,style,nav").forEach(n=>n.remove());
+  const push=()=>{if(cur.paras.length)out.push(cur)};
+  body.querySelectorAll("h1,h2,h3,p,pre,hr,blockquote").forEach(n=>{
+    const tag=n.tagName,t=(n.textContent||"").replace(/\s+/g," ").trim();
+    if(/^H[123]$/.test(tag)){if(!t)return;if(cur.paras.length){push();cur={title:t,paras:[]}}else cur.title=cur.title?cur.title+" — "+t:t}
+    else if(tag==="HR"){cur.paras.push({hr:1})}
+    else if(tag==="PRE"){if(t)cur.paras.push({v:n.textContent.replace(/\s+$/,"")})}
+    else if(t&&!n.closest("blockquote")||tag==="BLOCKQUOTE"&&t&&!n.querySelector("p")){cur.paras.push(t)}
+  });
+  push();return out;
+}
+function parseHTML(raw,name){
+  const doc=new DOMParser().parseFromString(raw,"text/html");
+  const meta={};
+  const t=doc.querySelector("title");if(t){const m=t.textContent.match(/^(?:The Project Gutenberg eBook of\s+)?(.+?)(?:,\s*by\s+(.+))?$/is);if(m){meta.title=m[1].replace(/\s+/g," ").trim();if(m[2])meta.author=m[2].replace(/\s+/g," ").trim()}}
+  let ch=htmlToChapters(doc);
+  // drop Gutenberg boilerplate chapters
+  ch=ch.map(c=>({title:c.title,paras:c.paras.filter(p=>typeof p!=="string"||!/^\*\*\*\s*(START|END) OF/i.test(p))}));
+  const si=ch.findIndex(c=>c.paras.some(p=>typeof p==="string"&&/START OF (THE|THIS) PROJECT GUTENBERG/i.test(p)));
+  ch=ch.filter(c=>!/^(?:the )?project gutenberg|^a note|^contents$/i.test(c.title)||c.paras.length>8);
+  ch=ch.filter(c=>c.paras.length);
+  ch.forEach((c,i)=>{if(!c.title)c.title=i?"Section "+(i+1):"Beginning"});
+  if(!ch.length)throw new Error("No readable text found in that HTML file.");
+  return finish(ch,meta,name);
+}
+async function parseEpub(buf,name){
+  if(!window.JSZip)throw new Error("The EPUB reader library did not load. Try the .txt or .html file instead.");
+  const zip=await JSZip.loadAsync(buf);
+  const rd=async p=>{const f=zip.file(p)||zip.file(decodeURIComponent(p));if(!f)throw new Error("Missing "+p);return f.async("string")};
+  const xml=s=>new DOMParser().parseFromString(s,"application/xml");
+  const cont=xml(await rd("META-INF/container.xml"));
+  const opfPath=cont.querySelector("rootfile").getAttribute("full-path");
+  const opf=xml(await rd(opfPath));
+  const base=opfPath.includes("/")?opfPath.replace(/[^/]*$/,""):"";
+  const man={};opf.querySelectorAll("manifest > item").forEach(i=>man[i.getAttribute("id")]=i.getAttribute("href"));
+  const g=t=>{const e=opf.getElementsByTagNameNS("*",t)[0];return e?e.textContent.trim():""};
+  const meta={title:g("title"),author:g("creator")};
+  const ch=[];
+  for(const ir of opf.querySelectorAll("spine > itemref")){
+    const href=man[ir.getAttribute("idref")];if(!href)continue;
+    let s;try{s=await rd(base+href.split("#")[0])}catch(e){continue}
+    const doc=new DOMParser().parseFromString(s,"text/html");
+    const parts=htmlToChapters(doc);
+    const title=(doc.querySelector("h1,h2,h3")||{}).textContent;
+    if(!parts.length)continue;
+    const paras=parts.flatMap(p=>p.paras);
+    if(!paras.length)continue;
+    ch.push({title:(title||parts[0].title||"").replace(/\s+/g," ").trim(),paras});
+  }
+  const keep=ch.filter(c=>!/^(?:the )?project gutenberg|license|^cover$/i.test(c.title)||words(c.paras.join(" "))>600);
+  keep.forEach((c,i)=>{if(!c.title)c.title="Section "+(i+1)});
+  if(!keep.length)throw new Error("No readable text found in that EPUB.");
+  return finish(keep,meta,name);
+}
+function finish(ch,meta,name){
+  const wl=c=>words(c.paras.map(p=>typeof p==="string"?p:p.v||"").join(" "));
+  ch=ch.flatMap(c=>{
+    const w=wl(c);if(w<=12000)return [c];
+    const n=Math.ceil(w/8000),target=w/n,parts=[];let cur=[],cw=0;
+    c.paras.forEach(p=>{const pw=typeof p==="string"?words(p):words(p.v||"");cur.push(p);cw+=pw;if(cw>=target&&parts.length<n-1){parts.push(cur);cur=[];cw=0}});
+    if(cur.length)parts.push(cur);
+    return parts.map((ps,i)=>({title:c.title+" ("+(i+1)+"/"+parts.length+")",paras:ps}));
+  });
+  const title=(meta.title||name.replace(/\.[^.]+$/,"").replace(/[_-]+/g," ")).trim();
+  const wc=ch.map(c=>words(c.paras.map(p=>typeof p==="string"?p:p.v||"").join(" ")));
+  return {id:"b"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),title,author:(meta.author||"").trim(),chapters:ch,wc,total:wc.reduce((a,b)=>a+b,0),pos:{c:0,f:0},added:Date.now()};
+}
+async function importFile(f){
+  const n=f.name.toLowerCase();let b;
+  if(n.endsWith(".epub"))b=await parseEpub(await f.arrayBuffer(),f.name);
+  else{
+    const raw=await f.text();
+    b=(n.endsWith(".html")||n.endsWith(".htm")||/^\s*(<!doctype|<html)/i.test(raw.slice(0,200)))?parseHTML(raw,f.name):parseText(raw,f.name);
+  }
+  if(b.total<30)throw new Error("That file has almost no text in it.");
+  await putBook(b);return b;
+}
+
+/* ---------- library view ---------- */
+const msg=(t,err)=>{const m=$("msg");m.textContent=t;m.className="msg"+(err?" err":"")};
+let CAT=[];
+const fmtH=w=>{const h=w/230/60;return h<1?Math.round(h*60)+" min":(Math.round(h*10)/10)+" h"};
+function readFrac(b){let before=0;for(let i=0;i<b.pos.c;i++)before+=b.wc[i];return b.total?(before+b.wc[b.pos.c]*b.pos.f)/b.total:0}
+async function loadCatalog(){
+  try{const r=await fetch("books/catalog.json");if(!r.ok)throw 0;CAT=await r.json()}catch(e){CAT=[];msg("The built-in library could not be loaded. You can still add a file below.",true)}
+  renderCat();
+}
+function card(title,author,metaTxt,frac,onclick,id){
+  const o=document.createElement("button");o.type="button";o.className="book";
+  o.innerHTML='<span class="t"></span><span class="a"></span><span class="meta"></span>'+(frac!=null?'<span class="bar"><i></i></span>':"");
+  o.querySelector(".t").textContent=title;o.querySelector(".a").textContent=author||"";
+  o.querySelector(".meta").textContent=metaTxt;
+  if(frac!=null)o.querySelector("i").style.width=Math.round(frac*100)+"%";
+  o.onclick=()=>onclick(o);return o;
+}
+function renderCat(){
+  const q=$("q").value.trim().toLowerCase();
+  const list=CAT.filter(b=>!q||(b.title+" "+b.author+" "+b.id).toLowerCase().includes(q));
+  const box=$("cat");box.textContent="";
+  $("catTitle").textContent=q?"Matches ("+list.length+")":"Library ("+CAT.length+" books)";
+  list.forEach(b=>box.append(card(b.title,b.author,"#"+b.id+" · "+b.words.toLocaleString("en")+" words · "+fmtH(b.words),null,el=>openById(b.id,el))));
+  if(!list.length){const p=document.createElement("p");p.className="small";p.style.color="var(--muted)";p.textContent="No match in the library. If you typed a Gutenberg ID, press Open to try it.";box.append(p)}
+}
+async function renderShelf(){
+  const bs=(await allBooks()).filter(b=>readFrac(b)>0.002||b.guide).sort((a,b)=>(b.opened||0)-(a.opened||0));
+  $("contWrap").hidden=!bs.length;const sh=$("shelf");sh.textContent="";
+  bs.forEach(b=>{
+    const wrap=document.createElement("div");wrap.style.cssText="position:relative;min-width:0";
+    wrap.append(card(b.title,b.author,Math.round(readFrac(b)*100)+"% read · "+fmtH(b.total*(1-readFrac(b)))+" left",readFrac(b),()=>openBook(b)));
+    const x=document.createElement("button");x.type="button";x.textContent="Remove";x.setAttribute("aria-label","Remove "+b.title);
+    x.style.cssText="position:absolute;top:8px;right:8px;background:none;border:0;color:var(--muted);padding:4px 8px;border-radius:4px;font-size:.8rem";
+    x.onclick=async()=>{if(x.dataset.sure){await delBook(b.id);renderShelf()}else{x.dataset.sure=1;x.textContent="Remove?";setTimeout(()=>{x.dataset.sure="";x.textContent="Remove"},2500)}};
+    wrap.append(x);sh.append(wrap);
+  });
+}
+async function openById(id,el){
+  id=parseInt(id,10);
+  const meta=CAT.find(b=>b.id===id);
+  if(!meta){msg("ID "+id+" is not in this library. Open the section at the bottom to add its file from gutenberg.org.",true);return}
+  const have=(await allBooks()).find(b=>b.gid===id);
+  if(have){openBook(have);return}
+  if(el)el.classList.add("loading");msg("Opening “"+meta.title+"”…");
+  try{
+    const r=await fetch("books/"+id+".txt");if(!r.ok)throw new Error("HTTP "+r.status);
+    const raw=await r.text();
+    const b=parseText(raw,meta.title);b.title=meta.title;b.author=meta.author;b.gid=id;
+    if(b.total<30)throw new Error("empty text");
+    await putBook(b);msg("");openBook(b);
+  }catch(e){msg("Could not open that book ("+(e.message||e)+"). Try again.",true)}
+  finally{if(el)el.classList.remove("loading")}
+}
+$("q").addEventListener("input",()=>{msg("");renderCat()});
+$("findForm").addEventListener("submit",e=>{
+  e.preventDefault();const v=$("q").value.trim();
+  if(/^#?\d+$/.test(v)){openById(v.replace("#",""));return}
+  const hits=CAT.filter(b=>(b.title+" "+b.author).toLowerCase().includes(v.toLowerCase()));
+  if(hits.length===1)openById(hits[0].id);else if(!v)msg("Type a title, an author or a Gutenberg ID.",true);else if(!hits.length)msg("Nothing matches “"+v+"”.",true)
+});
+async function handleFiles(fs){
+  msg("Reading…");let ok=0;
+  for(const f of fs){try{const b=await importFile(f);ok++;if(fs.length===1){msg("");openBook(b);return}}catch(e){msg(f.name+": "+e.message,true);return}}
+  msg("Added "+ok+" books.");renderShelf();
+}
+$("file").addEventListener("change",e=>{handleFiles([...e.target.files]);e.target.value=""});
+const drop=$("drop");
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("over")}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("over")}));
+drop.addEventListener("drop",e=>handleFiles([...e.dataTransfer.files]));
+
+/* ---------- paged reader ---------- */
+let book=null,saveT=null,page=0,pages=1,pageW=0,gap=48,busy=false,lastSize="";
+const flow=$("flow"),view=$("view"),stage=$("stage");
+function openBook(b){
+  book=b;b.opened=Date.now();putBook(b);
+  $("lib").hidden=true;$("reader").hidden=false;document.documentElement.classList.add("reading");
+  $("tline").hidden=false;$("tocBtn").hidden=false;$("listenBtn").hidden=false;
+  $("tline").textContent=b.title+(b.author?" — "+b.author:"");
+  buildToc();scrollTo(0,0);showChapter(b.pos.c,b.pos.f);
+}
+function buildToc(){
+  const t=$("toc");t.textContent="";
+  book.chapters.forEach((c,i)=>{const li=document.createElement("li");const bt=document.createElement("button");bt.type="button";bt.textContent=c.title;bt.onclick=()=>{closeAll();showChapter(i,0)};li.append(bt);t.append(li)});
+}
+const ABBR=new Set(["mr","mrs","ms","dr","st","sr","jr","mt","col","capt","gen","lt","prof","rev","hon","vs","etc","no","messrs","mme","mlle","sgt","gov","sen","rep","esq","viz","cf","ch","vol","pp","fig"]);
+function splitSentences(t){
+  const out=[];let start=0,m;const re=/[.!?\u2026]+["'\u201D\u2019)\]]*\s+(?=["'\u201C\u2018(\[]?[A-Z0-9])/g;
+  while((m=re.exec(t))){
+    if(m[0][0]==="."&&/^\.["'\u201D\u2019)\]]*\s+$/.test(m[0])){
+      const pw=(t.slice(start,m.index).match(/([A-Za-z]+)$/)||[])[1];
+      if(pw&&(ABBR.has(pw.toLowerCase())||(pw.length===1&&/[A-Z]/.test(pw))))continue;
+    }
+    const end=m.index+m[0].length;out.push(t.slice(start,end).trim());start=end;
+  }
+  const rest=t.slice(start).trim();if(rest)out.push(rest);
+  return out;
+}
+function chunkify(t){
+  if(t.length<=260)return [t];
+  const mid=t.length/2;let best=-1,bd=1e9,m;
+  const re=/[;:,\u2014]\s+/g;
+  while((m=re.exec(t))){const at=m.index+m[0].length;const d=Math.abs(at-mid);if(d<bd&&at>40&&t.length-at>40){bd=d;best=at}}
+  if(best<0){const sp=/\s+/g;while((m=sp.exec(t))){const at=m.index+m[0].length;const d=Math.abs(at-mid);if(d<bd){bd=d;best=at}}}
+  if(best<=0)return [t];
+  return chunkify(t.slice(0,best).trim()).concat(chunkify(t.slice(best).trim()));
+}
+const ROM=/^M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
+function romanToInt(r){const v={I:1,V:5,X:10,L:50,C:100,D:500,M:1000};let n=0;for(let i=0;i<r.length;i++){const a=v[r[i]],b=v[r[i+1]]||0;n+=a<b?-a:a}return n}
+function spokenTitle(t){
+  const m=t.match(/^(?:((?:chapter|book|part|letter|canto|act|stave|volume|scene)\s+))?([IVXLCDM]+)(?:[.:\s-]+(.*))?$/i);
+  if(m&&m[2]===m[2].toUpperCase()&&ROM.test(m[2])){return ((m[1]||"Chapter ")+romanToInt(m[2])+(m[3]?". "+m[3]:"")).replace(/^(\w)/,c=>c.toUpperCase())}
+  return t;
+}
+function cleanSpeech(t){return t.replace(/--/g,"\u2014").replace(/_/g,"").replace(/\s+/g," ").trim()}
+function renderInline(el,text){
+  text.split(/(_[^_]+_)/).forEach(seg=>{
+    if(!seg)return;
+    if(seg.length>2&&seg[0]==="_"&&seg[seg.length-1]==="_"){const em=document.createElement("em");em.textContent=seg.slice(1,-1);el.append(em)}
+    else el.append(document.createTextNode(seg.replace(/--/g,"\u2014").replace(/_/g,"")));
+  });
+}
+function addSentences(parent,text,o){
+  const parts=o.whole?[text]:splitSentences(text);
+  parts.forEach((part,i)=>{
+    const span=document.createElement("span");span.className="s";renderInline(span,part);
+    let sp=cleanSpeech(o.title?spokenTitle(part):part);
+    const speakable=/[A-Za-z0-9]/.test(sp)&&!/^\[.*\]$/.test(sp);
+    const rec={el:span,chunks:speakable?(o.verse?sp.split(/\n+/).flatMap(l=>chunkify(l)):chunkify(sp)):[],endsPara:i===parts.length-1};
+    if(o.verse)rec.chunks=speakable?text.replace(/_/g,"").split(/\n+/).map(l=>l.trim()).filter(l=>/[A-Za-z0-9]/.test(l)).flatMap(chunkify):[];
+    span.dataset.i=V.sents.length;V.sents.push(rec);
+    parent.append(span);if(i<parts.length-1)parent.append(document.createTextNode(" "));
+  });
+}
+function fillChapter(){
+  const c=book.chapters[book.pos.c];flow.textContent="";V.sents=[];V.idx=0;V.cur=null;
+  const k=document.createElement("p");k.className="ch-kicker";k.style.textIndent="0";k.textContent="Chapter "+(book.pos.c+1)+" of "+book.chapters.length;flow.append(k);
+  const h=document.createElement("h2");addSentences(h,c.title,{whole:true,title:true});flow.append(h);
+  let firstDone=false,afterBreak=false;
+  c.paras.forEach(p=>{
+    if(typeof p==="object"){
+      if(p.hr){flow.append(document.createElement("hr"));firstDone=false;afterBreak=true}
+      else if(p.v){const e=document.createElement("p");e.className="verse";addSentences(e,p.v,{whole:true,verse:true});flow.append(e)}
+      return;
+    }
+    const e=document.createElement("p");addSentences(e,p,{});
+    if(!firstDone&&p.length>80){e.className="first";firstDone=true}else if(afterBreak)e.className="sb";
+    afterBreak=false;flow.append(e);
+  });
+  document.querySelectorAll("#toc button").forEach((b,j)=>b.setAttribute("aria-current",j===book.pos.c));
+}
+function layout(){
+  // size the stage to the space left under the header and above the footer
+  const prog=$("foot"),rootPad=parseFloat(getComputedStyle(document.documentElement).paddingBottom)||0;
+  const top=stage.getBoundingClientRect().top;
+  const H=Math.max(200,Math.floor(innerHeight-top-prog.offsetHeight-rootPad-6));
+  stage.style.height=H+"px";
+  const sw=stage.clientWidth,mpx=prefs.measure*prefs.size;
+  const cols=sw>=2*mpx+gap+40?2:1;
+  gap=cols===2?Math.max(40,Math.round(prefs.size*2.4)):0;
+  pageW=Math.min(sw,Math.round(cols*mpx+(cols-1)*gap));
+  view.style.width=pageW+"px";view.style.height=(H-36)+"px";
+  flow.style.width=pageW+"px";flow.style.columnCount=cols;flow.style.columnGap=gap+"px";
+  pages=Math.max(1,Math.round((flow.scrollWidth+gap)/(pageW+gap)));
+}
+function showChapter(i,frac){
+  i=Math.max(0,Math.min(book.chapters.length-1,i));book.pos.c=i;
+  fillChapter();layout();voiceChapterChanged();
+  let p;if(frac==="last")p=pages-1;else p=Math.min(pages-1,Math.floor((frac||0)*pages+1e-6));
+  goPage(p,true);
+}
+function goPage(p,instant){
+  page=Math.max(0,Math.min(pages-1,p));
+  if(instant){const t=flow.style.transition;flow.style.transition="none";flow.style.transform="translateX("+(-page*(pageW+gap))+"px)";void flow.offsetWidth;flow.style.transition=t}
+  else flow.style.transform="translateX("+(-page*(pageW+gap))+"px)";
+  book.pos.f=pages>1?page/pages:0;updateUI();voicePageChanged();
+}
+function next(){if(!book)return;userNav();if(page<pages-1)goPage(page+1);else if(book.pos.c<book.chapters.length-1)showChapter(book.pos.c+1,0)}
+function prev(){if(!book)return;userNav();if(page>0)goPage(page-1);else if(book.pos.c>0)showChapter(book.pos.c-1,"last")}
+function updateUI(){
+  const c=book.pos.c;let before=0;for(let i=0;i<c;i++)before+=book.wc[i];
+  const done=(before+book.wc[c]*(page+1)/pages)/book.total;
+  $("pbar").style.width=(Math.min(1,done)*100).toFixed(1)+"%";
+  $("chl").textContent=Math.round(Math.min(1,done)*100)+"% of book";
+  $("pgl").textContent="Page "+(page+1)+" of "+pages+" · ch. "+(c+1)+"/"+book.chapters.length;
+  const mins=Math.max(0,Math.round(book.total*(1-done)/230));
+  $("left").textContent=(mins>=60?Math.floor(mins/60)+" h "+(mins%60)+" min":mins+" min")+" left";
+  $("prev").disabled=c===0&&page===0;$("next").disabled=c===book.chapters.length-1&&page===pages-1;
+  clearTimeout(saveT);saveT=setTimeout(()=>putBook(book),500);
+}
+$("next").onclick=next;$("prev").onclick=prev;
+stage.addEventListener("click",e=>{
+  if(!$("drawer").hidden||!$("sheet").hidden)return;
+  const r=stage.getBoundingClientRect(),x=(e.clientX-r.left)/r.width;
+  if(V.open&&x>=0.3&&x<=0.7){const sp=e.target.closest&&e.target.closest(".s");if(sp){voiceJump(Number(sp.dataset.i));return}}
+  if(x<0.3)prev();else if(x>0.7)next();
+});
+let tx0=null;
+stage.addEventListener("touchstart",e=>{tx0=e.touches[0].clientX},{passive:true});
+stage.addEventListener("touchend",e=>{if(tx0==null)return;const dx=e.changedTouches[0].clientX-tx0;tx0=null;if(Math.abs(dx)>50){e.preventDefault();dx<0?next():prev()}});
+addEventListener("keydown",e=>{
+  if($("reader").hidden||/INPUT|SELECT|TEXTAREA/.test((e.target||{}).tagName||""))return;
+  if(e.key===" "&&V.open){e.preventDefault();voiceToggle()}
+  else if(e.key==="ArrowRight"||e.key==="PageDown"||e.key===" "){e.preventDefault();next()}
+  else if(e.key==="ArrowLeft"||e.key==="PageUp"){e.preventDefault();prev()}
+  else if(e.key==="]")showChapter(book.pos.c+1,0);
+  else if(e.key==="[")showChapter(book.pos.c-1,0);
+  else if(e.key==="Escape")closeAll();
+});
+function relayout(){
+  if(!book||$("reader").hidden)return;
+  const f=book.pos.f,key=innerWidth+"x"+innerHeight+"|"+prefs.size+prefs.font+prefs.measure+prefs.lh;
+  layout();goPage(Math.min(pages-1,Math.floor(f*pages+1e-6)),true);lastSize=key;
+}
+let rt=null;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(relayout,150)});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>setTimeout(relayout,50));
+$("home").onclick=async()=>{if(book)await putBook(book);book=null;voiceStop("");V.open=false;$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
+
+const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,gpu:!!navigator.gpu},store.get("marginalia.prefs",{}));
+/* ---------- voice reader ---------- */
+const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noKokoro:false,detached:false};
+const KK={worker:null,ready:null,pending:new Map(),nid:1,cache:new Map(),ctx:null,device:""};
+const KK_VOICES=[["af_heart","Heart (US, female)"],["af_bella","Bella (US, female)"],["af_nicole","Nicole (US, female)"],["am_michael","Michael (US, male)"],["am_fenrir","Fenrir (US, male)"],["bf_emma","Emma (UK, female)"],["bm_george","George (UK, male)"],["bm_fable","Fable (UK, male)"]];
+const ICON={play:'<svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg>',pause:'<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>'};
+const vStat=t=>{$("vStat").textContent=t;$("vStat").title=t};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let brVoices=[];
+function loadBrVoices(){try{brVoices=(speechSynthesis.getVoices()||[]).filter(v=>/^en/i.test(v.lang))}catch(e){brVoices=[]}fillVoiceSelect()}
+if("speechSynthesis" in window){loadBrVoices();try{speechSynthesis.addEventListener("voiceschanged",loadBrVoices)}catch(e){}}
+function pickBrVoice(){
+  if(prefs.brVoice){const v=brVoices.find(x=>x.voiceURI===prefs.brVoice);if(v)return v}
+  const rank=v=>(/natural|neural|online/i.test(v.name)?0:/premium|enhanced/i.test(v.name)?1:/google/i.test(v.name)?2:3)+(v.default?-0.5:0);
+  return brVoices.slice().sort((a,b)=>rank(a)-rank(b))[0]||null;
+}
+function fillVoiceSelect(){
+  const sel=$("vSel");if(!sel)return;sel.textContent="";
+  const useKk=prefs.engine==="natural"&&!V.noKokoro;
+  const list=useKk?KK_VOICES.map(([id,n])=>[id,n]):brVoices.map(v=>[v.voiceURI,v.name+" ("+v.lang+")"]);
+  if(!list.length){const o=document.createElement("option");o.textContent=useKk?"":"No voices found in this browser";sel.append(o);sel.disabled=true;return}
+  sel.disabled=false;
+  list.forEach(([id,n])=>{const o=document.createElement("option");o.value=id;o.textContent=n;sel.append(o)});
+  sel.value=useKk?prefs.kkVoice:(pickBrVoice()||{}).voiceURI||list[0][0];
+}
+$("vSel").addEventListener("change",e=>{if(prefs.engine==="natural"&&!V.noKokoro)prefs.kkVoice=e.target.value;else prefs.brVoice=e.target.value;store.set("marginalia.prefs",prefs);voiceRestartIfPlaying()});
+
+/* position helpers */
+function pageOf(el){
+  const r=el.getClientRects()[0];if(!r)return page;
+  const fr=flow.getBoundingClientRect();
+  return Math.max(0,Math.min(pages-1,Math.floor((r.left-fr.left+4)/(pageW+gap))));
+}
+function firstOnPage(){for(let i=0;i<V.sents.length;i++){if(pageOf(V.sents[i].el)>=page)return i}return Math.max(0,V.sents.length-1)}
+function mark(i){
+  const s=V.sents[i];if(!s)return;
+  if(V.cur)V.cur.classList.remove("hl");
+  V.cur=s.el;s.el.classList.add("hl");
+}
+function followPage(){if(V.detached||!V.cur)return;const p=pageOf(V.cur);if(p!==page)goPage(p)}
+function setDetached(on){V.detached=on;$("vFollow").hidden=!on||!V.open}
+function userNav(){if(V.playing&&V.cur&&!V.detached)setDetached(true)}
+function voicePageChanged(){if(V.detached&&V.cur&&pageOf(V.cur)===page)setDetached(false)}
+$("vFollow").onclick=()=>{setDetached(false);followPage()};
+
+/* Kokoro (natural voice) through a worker */
+function kkLoad(){
+  if(KK.ready)return KK.ready;
+  KK.ready=new Promise((res,rej)=>{
+    let w;
+    try{w=new Worker("tts-worker.js",{type:"module"})}catch(e){rej(e);return}
+    KK.worker=w;
+    w.onmessage=e=>{
+      const m=e.data;
+      if(m.type==="progress")vStat("Downloading natural voice… "+m.pct+"%");
+      else if(m.type==="ready"){KK.device=m.device;res(m)}
+      else if(m.type==="audio"){const p=KK.pending.get(m.id);if(p){KK.pending.delete(m.id);p.res({f:m.audio,sr:m.sr})}}
+      else if(m.type==="error"){if(m.id==null)rej(new Error(m.message));else{const p=KK.pending.get(m.id);if(p){KK.pending.delete(m.id);p.rej(new Error(m.message))}}}
+    };
+    w.onerror=()=>rej(new Error("The voice worker could not start."));
+    w.postMessage({type:"load",gpu:prefs.gpu});
+    setTimeout(()=>rej(new Error("Loading the voice took too long.")),600000);
+  });
+  KK.ready.catch(()=>{KK.ready=null;if(KK.worker){KK.worker.terminate();KK.worker=null}});
+  return KK.ready;
+}
+function kkAudio(text){
+  const key=prefs.kkVoice+"|"+prefs.speed+"|"+text;let p=KK.cache.get(key);
+  if(!p){
+    p=new Promise((res,rej)=>{const id=KK.nid++;KK.pending.set(id,{res,rej});KK.worker.postMessage({type:"gen",id,text,voice:prefs.kkVoice,speed:prefs.speed})});
+    KK.cache.set(key,p);p.catch(()=>KK.cache.delete(key));
+  }
+  return p;
+}
+function kkPrefetch(){
+  const keep=new Set(),want=[];
+  for(let i=V.idx;i<V.sents.length&&want.length<4;i++)for(const c of V.sents[i].chunks){want.push(c);if(want.length>=4)break}
+  want.forEach(c=>{keep.add(prefs.kkVoice+"|"+prefs.speed+"|"+c);kkAudio(c).catch(()=>{})});
+  for(const k of KK.cache.keys())if(!keep.has(k))KK.cache.delete(k);
+}
+function ensureCtx(){
+  if(!KK.ctx){try{KK.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){KK.ctx=null}}
+  if(KK.ctx&&KK.ctx.state==="suspended")KK.ctx.resume().catch(()=>{});
+}
+async function kkSpeak(text,tok){
+  const wait=setTimeout(()=>{if(tok===V.token)vStat("Preparing the next sentence\u2026")},600);
+  let a;try{a=await kkAudio(text)}finally{clearTimeout(wait)}
+  if(tok!==V.token)return;
+  if($("vStat").textContent.startsWith("Preparing"))vStat(V.baseStat||"");
+  const ctx=KK.ctx;if(!ctx)throw new Error("Audio is not available in this browser.");
+  if(ctx.state==="suspended")await ctx.resume();
+  const buf=ctx.createBuffer(1,a.f.length,a.sr);buf.copyToChannel(a.f,0);
+  await new Promise(res=>{
+    const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);
+    V.cancel=()=>{try{src.onended=null;src.stop()}catch(e){}res()};
+    src.onended=res;src.start();
+  });
+}
+function brSpeak(text){
+  return new Promise(res=>{
+    if(!("speechSynthesis" in window)){res();return}
+    const u=new SpeechSynthesisUtterance(text),v=pickBrVoice();
+    if(v){u.voice=v;u.lang=v.lang}else u.lang="en-US";
+    u.rate=prefs.speed;
+    const guard=setTimeout(()=>res(),Math.max(4000,text.length*140/prefs.speed));  // some engines never fire onend
+    const done=()=>{clearTimeout(guard);res()};
+    u.onend=u.onerror=done;
+    V.cancel=()=>{try{speechSynthesis.cancel()}catch(e){}done()};
+    speechSynthesis.speak(u);
+  });
+}
+
+/* playback */
+async function chooseEngine(tok){
+  if(prefs.engine==="natural"&&!V.noKokoro){
+    try{vStat("Starting natural voice…");await kkLoad();return "kk"}
+    catch(err){V.noKokoro=true;V.kkError=String(err.message||err).slice(0,90);fillVoiceSelect()}
+  }
+  return "br";
+}
+function playUI(){
+  const b=$("vPlay");b.innerHTML=V.playing?ICON.pause:ICON.play;b.setAttribute("aria-label",V.playing?"Pause":"Play");
+  try{if("mediaSession" in navigator)navigator.mediaSession.playbackState=V.playing?"playing":"paused"}catch(e){}
+}
+function halt(){V.token++;if(V.cancel){const c=V.cancel;V.cancel=null;c()}try{if("speechSynthesis" in window)speechSynthesis.cancel()}catch(e){}}
+function voiceStop(msg){
+  V.playing=false;halt();playUI();
+  vStat(msg||(book?"Paused. Press play to continue.":""));
+}
+function voiceToggle(){V.playing?voiceStop():voicePlay()}
+async function voicePlay(){
+  if(!book||!V.sents.length)return;
+  ensureCtx();
+  V.playing=true;playUI();halt();
+  const tok=V.token;
+  let start=V.idx;
+  if(!V.cur||pageOf(V.sents[Math.min(start,V.sents.length-1)].el)!==page)start=firstOnPage();
+  V.idx=Math.min(start,V.sents.length-1);mark(V.idx);setDetached(false);
+  try{if("mediaSession" in navigator){navigator.mediaSession.metadata=new MediaMetadata({title:book.title,artist:book.author||""});
+    navigator.mediaSession.setActionHandler("play",voicePlay);navigator.mediaSession.setActionHandler("pause",()=>voiceStop());
+    navigator.mediaSession.setActionHandler("nexttrack",()=>voiceSeek(1));navigator.mediaSession.setActionHandler("previoustrack",()=>voiceSeek(-1))}}catch(e){}
+  const eng=await chooseEngine(tok);if(tok!==V.token)return;
+  V.eng=eng;V.baseStat=(eng==="kk"?"Reading aloud with the natural voice"+(KK.device==="webgpu"?" (GPU)":""):(V.kkError&&prefs.engine==="natural"?"Natural voice unavailable here ("+V.kkError+"). Using your browser's voice.":"Reading aloud with your browser's voice"));vStat(V.baseStat);
+  voiceLoop(tok,eng);
+}
+async function voiceLoop(tok,eng){
+  while(tok===V.token&&V.playing){
+    if(V.idx>=V.sents.length){
+      if(book.pos.c>=book.chapters.length-1){voiceStop("Reached the end of the book.");return}
+      showChapter(book.pos.c+1,0);               // rebuilds V.sents and resets V.idx
+      if(tok!==V.token)return;
+      continue;
+    }
+    const i=V.idx,s=V.sents[i];mark(i);followPage();
+    if(eng==="kk")kkPrefetch();
+    for(const ch of s.chunks){
+      if(tok!==V.token)return;
+      try{await(eng==="kk"?kkSpeak(ch,tok):brSpeak(ch))}
+      catch(err){
+        if(tok!==V.token)return;
+        if(eng==="kk"){V.noKokoro=true;eng="br";V.eng="br";fillVoiceSelect();vStat("The natural voice stopped working, so the browser voice takes over. ("+(err.message||err)+")");await brSpeak(ch)}
+        else{voiceStop("Speech failed: "+(err.message||err));return}
+      }
+    }
+    if(tok!==V.token)return;
+    await sleep(s.endsPara?320:90);
+    if(tok!==V.token)return;
+    V.idx=i+1;
+  }
+}
+function voiceSeek(d){
+  if(!V.sents.length)return;
+  const was=V.playing;V.idx=Math.max(0,Math.min(V.sents.length-1,V.idx+d));mark(V.idx);setDetached(false);followPage();
+  if(was){halt();V.playing=true;const tok=V.token;voiceLoop(tok,V.eng)}
+}
+function voiceJump(i){
+  if(!V.sents[i])return;
+  V.idx=i;mark(i);setDetached(false);
+  halt();V.playing=true;playUI();ensureCtx();
+  (async()=>{const tok=V.token;const eng=await chooseEngine(tok);if(tok!==V.token)return;V.eng=eng;voiceLoop(tok,eng)})();
+}
+function voiceRestartIfPlaying(){if(V.playing){V.idx=Math.max(0,V.idx);const i=V.idx;halt();voicePlayFrom(i)}}
+function voicePlayFrom(i){V.idx=i;V.playing=true;(async()=>{const tok=V.token;const eng=await chooseEngine(tok);if(tok!==V.token)return;V.eng=eng;voiceLoop(tok,eng)})()}
+function voiceEngineChanged(){if(prefs.engine==="natural"){V.noKokoro=false;V.kkError=""}fillVoiceSelect();voiceRestartIfPlaying()}
+function voiceChapterChanged(){
+  // called whenever a chapter is rendered; if the reader (not the voice) changed chapter while playing, restart there
+  setDetached(false);
+  if(V.playing){const tok=V.token;halt();V.playing=true;V.idx=0;mark(0);voiceLoop(V.token,V.eng||"br")}
+  else if(V.open&&V.sents.length)mark(0);
+  if(!V.open&&V.cur){V.cur.classList.remove("hl")}
+}
+$("vPlay").onclick=voiceToggle;
+$("vPrev").onclick=()=>voiceSeek(-1);
+$("vNext").onclick=()=>voiceSeek(1);
+$("listenBtn").onclick=()=>{
+  V.open=!V.open;$("voice").hidden=!V.open;$("listenBtn").setAttribute("aria-pressed",String(V.open));
+  if(V.open){playUI();vStat("Press play to start reading aloud from this page.");if(V.sents.length){V.idx=firstOnPage();mark(V.idx)}}
+  else{voiceStop("");if(V.cur)V.cur.classList.remove("hl");V.cur=null;setDetached(false)}
+  requestAnimationFrame(relayout);
+};
+if(!("speechSynthesis" in window)&&!window.Worker)$("listenBtn").remove();
+
+/* ---------- panels and settings ---------- */
+function closeAll(){$("drawer").hidden=true;$("sheet").hidden=true;$("scrim").hidden=true}
+$("tocBtn").onclick=()=>{closeAll();$("drawer").hidden=false;$("scrim").hidden=false};
+$("setBtn").onclick=()=>{const was=!$("sheet").hidden;closeAll();if(!was){$("sheet").hidden=false;$("scrim").hidden=false}};
+$("scrim").onclick=closeAll;
+function applyPrefs(){
+  const r=document.documentElement.style;
+  r.setProperty("--size",prefs.size+"px");r.setProperty("--measure",prefs.measure+"em");r.setProperty("--lh",prefs.lh);
+  r.setProperty("--read",prefs.font==="sans"?"var(--font-ui)":"var(--font-read)");
+  if(prefs.theme==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",prefs.theme);
+  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sGpu","gpu"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
+  store.set("marginalia.prefs",prefs);
+  flow.classList.toggle("nohl",!prefs.highlight);
+  if(typeof fillVoiceSelect==="function")fillVoiceSelect();
+  if(book)requestAnimationFrame(relayout);
+}
+$("sSize").onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs.size=Math.max(14,Math.min(32,prefs.size+Number(b.dataset.v)*2));applyPrefs()};
+const bool=v=>v==="true";
+[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sGpu","gpu",bool]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine"||k==="gpu")voiceEngineChanged()});
+applyPrefs();
+
+loadCatalog();renderShelf();
+})();
+</script>
+
+</body></html>
