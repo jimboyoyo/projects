@@ -581,7 +581,7 @@ $("home").onclick=async()=>{if(book)await putBook(book);book=null;voiceStop("");
 const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,gpu:!!navigator.gpu},store.get("marginalia.prefs",{}));
 /* ---------- voice reader ---------- */
 const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noKokoro:false,detached:false};
-const KK={worker:null,ready:null,pending:new Map(),nid:1,cache:new Map(),ctx:null,device:""};
+const KK={worker:null,ready:null,pending:new Map(),nid:1,cache:new Map(),ctx:null,device:"",dtype:"",epoch:1,rtf:0,n:0,warm:0};
 const KK_VOICES=[["af_heart","Heart (US, female)"],["af_bella","Bella (US, female)"],["af_nicole","Nicole (US, female)"],["am_michael","Michael (US, male)"],["am_fenrir","Fenrir (US, male)"],["bf_emma","Emma (UK, female)"],["bm_george","George (UK, male)"],["bm_fable","Fable (UK, male)"]];
 const ICON={play:'<svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg>',pause:'<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>'};
 const vStat=t=>{$("vStat").textContent=t;$("vStat").title=t};
@@ -624,6 +624,13 @@ function voicePageChanged(){if(V.detached&&V.cur&&pageOf(V.cur)===page)setDetach
 $("vFollow").onclick=()=>{setDetached(false);followPage()};
 
 /* Kokoro (natural voice) through a worker */
+const KK_KEEP=80;                                  // finished sentences kept for instant rewind and replay
+function kkInfo(){
+  let t="Reading aloud with the natural voice";
+  if(KK.device)t+=" ("+(KK.device==="webgpu"?"GPU":"CPU")+(KK.rtf?", "+KK.rtf.toFixed(1)+"\u00d7 real time":"")+")";
+  if(KK.rtf>1.2&&KK.n>=2)t+=". Slower than speech: try the GPU setting or the browser voice";
+  return t;
+}
 function kkLoad(){
   if(KK.ready)return KK.ready;
   KK.ready=new Promise((res,rej)=>{
@@ -632,31 +639,51 @@ function kkLoad(){
     KK.worker=w;
     w.onmessage=e=>{
       const m=e.data;
-      if(m.type==="progress")vStat("Downloading natural voice… "+m.pct+"%");
-      else if(m.type==="ready"){KK.device=m.device;res(m)}
-      else if(m.type==="audio"){const p=KK.pending.get(m.id);if(p){KK.pending.delete(m.id);p.res({f:m.audio,sr:m.sr})}}
+      if(m.type==="progress")vStat("Downloading natural voice\u2026 "+m.pct+"%");
+      else if(m.type==="status")vStat(m.text);
+      else if(m.type==="ready"){KK.device=m.device;KK.dtype=m.dtype;KK.warm=m.warmMs;res(m);if(V.open&&!V.playing)vStat("Natural voice ready. Press play.");if(V.playing&&V.eng==="kk")kkPrefetch()}
+      else if(m.type==="start"){const p=KK.pending.get(m.id);if(p)p.started=true}
+      else if(m.type==="skipped"){const p=KK.pending.get(m.id);if(p){KK.pending.delete(m.id);p.rej(new Error("skipped"))}}
+      else if(m.type==="audio"){
+        const p=KK.pending.get(m.id);
+        const dur=m.audio.length/m.sr*1000;
+        if(dur>400){KK.rtf=KK.rtf?KK.rtf*0.5+(m.ms/dur)*0.5:m.ms/dur;KK.n++;if(V.playing&&V.eng==="kk"&&!$("vStat").textContent.startsWith("Preparing")){V.baseStat=kkInfo();vStat(V.baseStat)}}
+        if(p){KK.pending.delete(m.id);p.res({f:m.audio,sr:m.sr})}
+      }
       else if(m.type==="error"){if(m.id==null)rej(new Error(m.message));else{const p=KK.pending.get(m.id);if(p){KK.pending.delete(m.id);p.rej(new Error(m.message))}}}
     };
     w.onerror=()=>rej(new Error("The voice worker could not start."));
-    w.postMessage({type:"load",gpu:prefs.gpu});
+    w.postMessage({type:"load",gpu:prefs.gpu,voice:prefs.kkVoice});
     setTimeout(()=>rej(new Error("Loading the voice took too long.")),600000);
   });
   KK.ready.catch(()=>{KK.ready=null;if(KK.worker){KK.worker.terminate();KK.worker=null}});
   return KK.ready;
 }
 function kkAudio(text){
-  const key=prefs.kkVoice+"|"+prefs.speed+"|"+text;let p=KK.cache.get(key);
-  if(!p){
-    p=new Promise((res,rej)=>{const id=KK.nid++;KK.pending.set(id,{res,rej});KK.worker.postMessage({type:"gen",id,text,voice:prefs.kkVoice,speed:prefs.speed})});
-    KK.cache.set(key,p);p.catch(()=>KK.cache.delete(key));
-  }
-  return p;
+  const key=prefs.kkVoice+"|"+prefs.speed+"|"+text;let e=KK.cache.get(key);
+  if(e){KK.cache.delete(key);KK.cache.set(key,e);return e.p}          // refresh recency
+  e={started:false,done:false};
+  e.p=new Promise((res,rej)=>{
+    const id=KK.nid++;e.res=res;e.rej=rej;KK.pending.set(id,e);
+    KK.worker.postMessage({type:"gen",id,epoch:KK.epoch,text,voice:prefs.kkVoice,speed:prefs.speed});
+  });
+  e.p.then(()=>{e.done=true},()=>{if(KK.cache.get(key)===e)KK.cache.delete(key)});
+  KK.cache.set(key,e);
+  let done=0;for(const [k,v] of KK.cache)if(v.done)done++;
+  for(const [k,v] of KK.cache){if(done<=KK_KEEP)break;if(v.done){KK.cache.delete(k);done--}}
+  return e.p;
 }
 function kkPrefetch(){
-  const keep=new Set(),want=[];
-  for(let i=V.idx;i<V.sents.length&&want.length<4;i++)for(const c of V.sents[i].chunks){want.push(c);if(want.length>=4)break}
-  want.forEach(c=>{keep.add(prefs.kkVoice+"|"+prefs.speed+"|"+c);kkAudio(c).catch(()=>{})});
-  for(const k of KK.cache.keys())if(!keep.has(k))KK.cache.delete(k);
+  if(!KK.worker)return;
+  const want=[];
+  for(let i=V.idx;i<V.sents.length&&want.length<3;i++)for(const c of V.sents[i].chunks){want.push(c);if(want.length>=3)break}
+  want.forEach(c=>{kkAudio(c).catch(()=>{})});
+}
+// Called when playback is interrupted: queued jobs for the old position are dropped by the worker.
+function kkCancelQueued(){
+  KK.epoch++;
+  if(KK.worker)KK.worker.postMessage({type:"epoch",n:KK.epoch});
+  for(const [k,v] of KK.cache)if(!v.started&&!v.done)KK.cache.delete(k);
 }
 function ensureCtx(){
   if(!KK.ctx){try{KK.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){KK.ctx=null}}
@@ -664,7 +691,7 @@ function ensureCtx(){
 }
 async function kkSpeak(text,tok){
   const wait=setTimeout(()=>{if(tok===V.token)vStat("Preparing the next sentence\u2026")},600);
-  let a;try{a=await kkAudio(text)}finally{clearTimeout(wait)}
+  let a;try{for(let t=0;;t++){try{a=await kkAudio(text);break}catch(err){if(err.message==='skipped'&&t<3&&tok===V.token){continue}throw err}}}finally{clearTimeout(wait)}
   if(tok!==V.token)return;
   if($("vStat").textContent.startsWith("Preparing"))vStat(V.baseStat||"");
   const ctx=KK.ctx;if(!ctx)throw new Error("Audio is not available in this browser.");
@@ -702,7 +729,7 @@ function playUI(){
   const b=$("vPlay");b.innerHTML=V.playing?ICON.pause:ICON.play;b.setAttribute("aria-label",V.playing?"Pause":"Play");
   try{if("mediaSession" in navigator)navigator.mediaSession.playbackState=V.playing?"playing":"paused"}catch(e){}
 }
-function halt(){V.token++;clearTimeout(V.resumeT);if(V.cancel){const c=V.cancel;V.cancel=null;c()}try{if("speechSynthesis" in window)speechSynthesis.cancel()}catch(e){}}
+function halt(){V.token++;kkCancelQueued();clearTimeout(V.resumeT);if(V.cancel){const c=V.cancel;V.cancel=null;c()}try{if("speechSynthesis" in window)speechSynthesis.cancel()}catch(e){}}
 function voiceStop(msg){
   V.playing=false;halt();playUI();
   vStat(msg||(book?"Paused. Press play to continue.":""));
@@ -720,7 +747,7 @@ async function voicePlay(){
     navigator.mediaSession.setActionHandler("play",voicePlay);navigator.mediaSession.setActionHandler("pause",()=>voiceStop());
     navigator.mediaSession.setActionHandler("nexttrack",()=>voiceSeek(1));navigator.mediaSession.setActionHandler("previoustrack",()=>voiceSeek(-1))}}catch(e){}
   const eng=await chooseEngine(tok);if(tok!==V.token)return;
-  V.eng=eng;V.baseStat=(eng==="kk"?"Reading aloud with the natural voice"+(KK.device==="webgpu"?" (GPU)":""):(V.kkError&&prefs.engine==="natural"?"Natural voice unavailable here ("+V.kkError+"). Using your browser's voice.":"Reading aloud with your browser's voice"));vStat(V.baseStat);
+  V.eng=eng;V.baseStat=(eng==="kk"?kkInfo():(V.kkError&&prefs.engine==="natural"?"Natural voice unavailable here ("+V.kkError+"). Using your browser's voice.":"Reading aloud with your browser's voice"));vStat(V.baseStat);
   voiceLoop(tok,eng);
 }
 async function voiceLoop(tok,eng){
@@ -790,7 +817,8 @@ $("vNext").onclick=()=>voiceSeek(1);
 $("vRepeat").onclick=voiceReplay;
 $("listenBtn").onclick=()=>{
   V.open=!V.open;$("voice").hidden=!V.open;$("listenBtn").setAttribute("aria-pressed",String(V.open));flow.classList.toggle("vmode",V.open);
-  if(V.open){playUI();vStat("Press play, or click any sentence to start there. \u2190 \u2192 step by sentence, \u2191 replays.");if(V.sents.length){V.idx=firstOnPage();mark(V.idx)}}
+  if(V.open){playUI();vStat("Press play, or click any sentence to start there. \u2190 \u2192 step by sentence, \u2191 replays.");if(V.sents.length){V.idx=firstOnPage();mark(V.idx)}
+    if(prefs.engine==="natural"&&!V.noKokoro)kkLoad().then(()=>{if(V.open&&!V.playing)kkPrefetch()}).catch(()=>{})}   // download and warm up while the reader decides
   else{voiceStop("");if(V.cur)V.cur.classList.remove("hl");V.cur=null;setDetached(false)}
   requestAnimationFrame(relayout);
 };
