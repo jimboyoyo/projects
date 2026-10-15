@@ -1,14 +1,27 @@
 // Runs the Kokoro text-to-speech model off the main thread so page turns stay smooth.
-// Messages in:  {type:"load", gpu:boolean} | {type:"gen", id, text, voice, speed}
-// Messages out: {type:"progress", pct} | {type:"ready", device} | {type:"audio", id, audio, sr} | {type:"error", id, message}
-// The package ships a self-contained browser bundle (it includes transformers.js and the ONNX runtime loader).
+//
+// Messages in:
+//   {type:"load", gpu:boolean, voice:string}
+//   {type:"gen", id, epoch, text, voice, speed}   queue one sentence for generation
+//   {type:"epoch", n}                             anything queued under an older epoch is dropped
+// Messages out:
+//   {type:"progress", pct} | {type:"status", text} | {type:"ready", device, dtype, warmMs}
+//   {type:"start", id} | {type:"audio", id, audio, sr, ms} | {type:"skipped", id} | {type:"error", id, message}
+//
+// The model runs one sentence at a time and a running job cannot be interrupted, so the page bumps the
+// epoch whenever you jump, step, replay or pause. Jobs that are still waiting are then skipped instead of
+// making the sentence you actually want wait behind them.
 import { KokoroTTS } from "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js";
 
 const MODEL = "onnx-community/Kokoro-82M-v1.0-ONNX";
 let tts = null;
-let chain = Promise.resolve(); // the model runs one request at a time
+let loadP = null;
+let latest = 0;          // newest epoch seen
+const queue = [];
+let busy = false;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function load(wantGpu) {
+async function load(wantGpu, voice) {
   const files = {};
   let best = 0;
   const progress_callback = (p) => {
@@ -23,35 +36,66 @@ async function load(wantGpu) {
   const attempts = [];
   if (wantGpu && self.navigator && self.navigator.gpu) attempts.push({ device: "webgpu", dtype: "fp32" });
   attempts.push({ device: "wasm", dtype: "q8" });
-  let lastErr;
+  let lastErr, used = null;
   for (const a of attempts) {
     try {
       tts = await KokoroTTS.from_pretrained(MODEL, { dtype: a.dtype, device: a.device, progress_callback });
-      postMessage({ type: "ready", device: a.device });
-      return;
+      used = a;
+      break;
     } catch (err) {
       lastErr = err;
     }
   }
-  throw lastErr;
+  if (!used) throw lastErr;
+  // The first run compiles shaders and allocates buffers, so do it now instead of during the first sentence.
+  postMessage({ type: "status", text: "Warming up the voice…" });
+  let warmMs = 0;
+  try {
+    const t0 = performance.now();
+    await tts.generate("Ready.", { voice: voice || "af_heart" });
+    if (used.device === "webgpu") await tts.generate("It was a bright cold day in April, and the clocks were striking thirteen.", { voice: voice || "af_heart" });
+    warmMs = Math.round(performance.now() - t0);
+  } catch (err) { /* a failed warm-up is not fatal */ }
+  postMessage({ type: "ready", device: used.device, dtype: used.dtype, warmMs });
+}
+
+async function pump() {
+  if (busy) return;
+  busy = true;
+  try {
+    if (loadP) await loadP;
+    for (;;) {
+      await sleep(2);                        // let any newer epoch message arrive before choosing the next job
+      const job = queue.shift();
+      if (!job) break;
+      if (job.epoch < latest) { postMessage({ type: "skipped", id: job.id }); continue; }
+      postMessage({ type: "start", id: job.id });
+      const t0 = performance.now();
+      try {
+        if (!tts) throw new Error("model not loaded");
+        const a = await tts.generate(job.text, { voice: job.voice, speed: job.speed });
+        const f = a.audio;
+        postMessage({ type: "audio", id: job.id, audio: f, sr: a.sampling_rate, ms: Math.round(performance.now() - t0) }, [f.buffer]);
+      } catch (err) {
+        postMessage({ type: "error", id: job.id, message: String((err && err.message) || err) });
+      }
+    }
+  } finally {
+    busy = false;
+  }
 }
 
 self.onmessage = (e) => {
   const m = e.data;
   if (m.type === "load") {
-    chain = chain.then(() => load(m.gpu)).catch((err) =>
+    loadP = load(m.gpu, m.voice).catch((err) =>
       postMessage({ type: "error", id: null, message: String((err && err.message) || err) })
     );
+  } else if (m.type === "epoch") {
+    latest = Math.max(latest, m.n);
   } else if (m.type === "gen") {
-    chain = chain.then(async () => {
-      try {
-        if (!tts) throw new Error("model not loaded");
-        const a = await tts.generate(m.text, { voice: m.voice, speed: m.speed });
-        const f = a.audio;
-        postMessage({ type: "audio", id: m.id, audio: f, sr: a.sampling_rate }, [f.buffer]);
-      } catch (err) {
-        postMessage({ type: "error", id: m.id, message: String((err && err.message) || err) });
-      }
-    });
+    latest = Math.max(latest, m.epoch);
+    queue.push(m);
+    pump();
   }
 };

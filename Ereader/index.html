@@ -72,6 +72,8 @@ html.reading{overflow:hidden}
 #flow .s{border-radius:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 #flow .s.hl{background:var(--hl)}
 #flow.nohl .s.hl{background:none}
+#flow .w.wh{background:var(--accent);color:var(--accent-fg);border-radius:3px;box-shadow:0 0 0 2px var(--accent)}
+#flow.nohl .w.wh,#flow.nowh .w.wh{background:none;color:inherit;box-shadow:none}
 #flow.vmode .s{cursor:pointer}
 #flow.vmode .s:hover:not(.hl){background:var(--mark)}
 #flow hr{border:0;text-align:center;margin:1em 0;color:var(--muted)}
@@ -182,6 +184,7 @@ html.reading{overflow:hidden}
   <div class="ctl"><label for="vSel">Voice</label><select id="vSel"></select></div>
   <div class="ctl"><label>Speed</label><div class="seg" id="sSpeed"><button data-v="0.8" type="button">0.8&times;</button><button data-v="1" type="button">1&times;</button><button data-v="1.25" type="button">1.25&times;</button><button data-v="1.5" type="button">1.5&times;</button></div></div>
   <div class="ctl"><label>Highlight spoken sentence</label><div class="seg" id="sHl"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
+  <div class="ctl"><label>Highlight spoken word</label><div class="seg" id="sWh"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
   <div class="ctl"><label>Natural voice on GPU</label><div class="seg" id="sGpu"><button data-v="false" type="button">Off</button><button data-v="true" type="button">On</button></div></div>
   <p class="note">The natural voice is a one-time download kept in your browser: about 90 MB, or about 330 MB with GPU, which is much faster. Each voice also fetches a small file the first time you use it. The browser voice needs no download.</p>
   <h3 style="margin-top:6px">Appearance</h3>
@@ -576,9 +579,10 @@ function relayout(){
 }
 let rt=null;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(relayout,150)});
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>setTimeout(relayout,50));
-$("home").onclick=async()=>{if(book)await putBook(book);book=null;voiceStop("");V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
+$("home").onclick=async()=>{if(book)await putBook(book);book=null;voiceStop("");wordsClear();V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
 
-const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,gpu:!!navigator.gpu},store.get("marginalia.prefs",{}));
+const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,wordHl:true,gpu:false,v:2},store.get("marginalia.prefs",{}));
+if((prefs.v||0)<2){prefs.gpu=false;prefs.v=2}   // GPU was on by default before; it is slow to start and unreliable for this model, so CPU is now the default
 /* ---------- voice reader ---------- */
 const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noKokoro:false,detached:false};
 const KK={worker:null,ready:null,pending:new Map(),nid:1,cache:new Map(),ctx:null,device:"",dtype:"",epoch:1,rtf:0,n:0,warm:0};
@@ -612,9 +616,62 @@ function pageOf(el){
   return Math.max(0,Math.min(pages-1,Math.floor((r.left-fr.left+4)/(pageW+gap))));
 }
 function firstOnPage(){for(let i=0;i<V.sents.length;i++){if(pageOf(V.sents[i].el)>=page)return i}return Math.max(0,V.sents.length-1)}
+/* word highlighting: spans are added only to the sentence being read, then removed again */
+function wordsClear(){
+  V.wstop=true;
+  if(V.wEl){const el=V.wEl;V.wEl=null;V.wSpans=null;V.wCur=null;
+    el.querySelectorAll(".w").forEach(w=>w.replaceWith(document.createTextNode(w.textContent)));el.normalize()}
+}
+function wordsWrap(el){
+  if(V.wEl===el&&V.wSpans)return V.wSpans;
+  wordsClear();
+  const tw=document.createTreeWalker(el,NodeFilter.SHOW_TEXT),nodes=[];
+  while(tw.nextNode())nodes.push(tw.currentNode);
+  const out=[];
+  nodes.forEach(n=>{
+    const t=n.nodeValue,frag=document.createDocumentFragment();let last=0,m;const re=/\S+/g;
+    while((m=re.exec(t))){
+      if(m.index>last)frag.append(document.createTextNode(t.slice(last,m.index)));
+      const w=document.createElement("span");w.className="w";w.textContent=m[0];frag.append(w);out.push(w);last=m.index+m[0].length;
+    }
+    if(last<t.length)frag.append(document.createTextNode(t.slice(last)));
+    n.replaceWith(frag);
+  });
+  V.wEl=el;V.wSpans=out;V.wCur=null;return out;
+}
+function wordHi(k){
+  if(!V.wSpans)return;
+  if(V.wCur)V.wCur.classList.remove("wh");
+  const w=V.wSpans[k];if(w){w.classList.add("wh");V.wCur=w}else V.wCur=null;
+}
+// which element words does each word of a chunk correspond to (counts differ for titles such as "CHAPTER III")
+function wordMap(rec,ci){
+  const cnt=rec.chunks.map(c=>(c.match(/\S+/g)||[]).length),M=cnt.reduce((a,b)=>a+b,0),N=V.wSpans.length;
+  let off=0;for(let j=0;j<ci;j++)off+=cnt[j];
+  return k=>N===M?Math.min(N-1,off+k):Math.min(N-1,Math.floor((off+k)*N/Math.max(1,M)));
+}
+function wordWeights(text){
+  const ws=text.match(/\S+/g)||[];
+  return ws.map(w=>{const L=w.replace(/[^A-Za-z0-9]/g,"").length;let x=Math.max(2,L)+1;if(/[,;:\u2014)]["'\u201d\u2019]?$/.test(w))x+=3;if(/[.!?]["'\u201d\u2019)]*$/.test(w))x+=5;return x});
+}
+// Kokoro gives the total audio length but no word times, so share it out by word length and punctuation.
+function wordsByTime(rec,ci,text,durMs,tok){
+  if(!prefs.highlight||!prefs.wordHl||!V.wSpans)return;
+  const map=wordMap(rec,ci),wt=wordWeights(text),tot=wt.reduce((a,b)=>a+b,0)||1,lead=40,span=Math.max(100,durMs*0.96-lead);
+  const ends=[];let acc=0;wt.forEach(x=>{acc+=x;ends.push(lead+span*acc/tot)});
+  const t0=performance.now();let k=-1;V.wstop=false;const run=V.wrun=(V.wrun||0)+1;
+  const tick=()=>{
+    if(tok!==V.token||V.wstop||V.wrun!==run)return;
+    const t=performance.now()-t0;if(t>ends[ends.length-1]+400)return;let n=0;while(n<ends.length-1&&t>ends[n])n++;
+    if(n!==k){k=n;wordHi(map(n))}
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
 function mark(i){
   const s=V.sents[i];if(!s)return;
   if(V.cur)V.cur.classList.remove("hl");
+  if(V.cur!==s.el)wordsClear();
   V.cur=s.el;s.el.classList.add("hl");
 }
 function followPage(){if(V.detached||!V.cur)return;const p=pageOf(V.cur);if(p!==page)goPage(p)}
@@ -647,7 +704,7 @@ function kkLoad(){
       else if(m.type==="audio"){
         const p=KK.pending.get(m.id);
         const dur=m.audio.length/m.sr*1000;
-        if(dur>400){KK.rtf=KK.rtf?KK.rtf*0.5+(m.ms/dur)*0.5:m.ms/dur;KK.n++;if(V.playing&&V.eng==="kk"&&!$("vStat").textContent.startsWith("Preparing")){V.baseStat=kkInfo();vStat(V.baseStat)}}
+        console.log('[marginalia] sentence rendered in '+m.ms+' ms for '+Math.round(dur)+' ms of audio ('+KK.device+')');if(dur>400){KK.rtf=KK.rtf?KK.rtf*0.5+(m.ms/dur)*0.5:m.ms/dur;KK.n++;if(V.playing&&V.eng==="kk"&&!$("vStat").textContent.startsWith("Preparing")){V.baseStat=kkInfo();vStat(V.baseStat)}}
         if(p){KK.pending.delete(m.id);p.res({f:m.audio,sr:m.sr})}
       }
       else if(m.type==="error"){if(m.id==null)rej(new Error(m.message));else{const p=KK.pending.get(m.id);if(p){KK.pending.delete(m.id);p.rej(new Error(m.message))}}}
@@ -689,7 +746,7 @@ function ensureCtx(){
   if(!KK.ctx){try{KK.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){KK.ctx=null}}
   if(KK.ctx&&KK.ctx.state==="suspended")KK.ctx.resume().catch(()=>{});
 }
-async function kkSpeak(text,tok){
+async function kkSpeak(text,tok,rec,ci){
   const wait=setTimeout(()=>{if(tok===V.token)vStat("Preparing the next sentence\u2026")},600);
   let a;try{for(let t=0;;t++){try{a=await kkAudio(text);break}catch(err){if(err.message==='skipped'&&t<3&&tok===V.token){continue}throw err}}}finally{clearTimeout(wait)}
   if(tok!==V.token)return;
@@ -701,9 +758,10 @@ async function kkSpeak(text,tok){
     const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);
     V.cancel=()=>{try{src.onended=null;src.stop()}catch(e){}res()};
     src.onended=res;src.start();
+    if(rec&&prefs.highlight&&prefs.wordHl){wordsWrap(rec.el);wordsByTime(rec,ci,text,buf.duration*1000,tok)}
   });
 }
-function brSpeak(text){
+function brSpeak(text,rec,ci,tok){
   return new Promise(res=>{
     if(!("speechSynthesis" in window)){res();return}
     const u=new SpeechSynthesisUtterance(text),v=pickBrVoice();
@@ -712,6 +770,12 @@ function brSpeak(text){
     const guard=setTimeout(()=>res(),Math.max(4000,text.length*140/prefs.speed));  // some engines never fire onend
     const done=()=>{clearTimeout(guard);res()};
     u.onend=u.onerror=done;
+    if(rec&&prefs.highlight&&prefs.wordHl){
+      wordsWrap(rec.el);const map=wordMap(rec,ci),starts=[];let m;const re=/\S+/g;while((m=re.exec(text)))starts.push(m.index);
+      let got=false;
+      u.onboundary=ev=>{if(ev.name&&ev.name!=="word")return;got=true;V.wstop=true;let k=0;while(k+1<starts.length&&starts[k+1]<=ev.charIndex)k++;wordHi(map(k))};
+      u.onstart=()=>{setTimeout(()=>{if(!got&&tok===V.token)wordsByTime(rec,ci,text,Math.max(600,text.length*72/prefs.speed),tok)},500)};
+    }
     V.cancel=()=>{try{speechSynthesis.cancel()}catch(e){}done()};
     speechSynthesis.speak(u);
   });
@@ -729,7 +793,7 @@ function playUI(){
   const b=$("vPlay");b.innerHTML=V.playing?ICON.pause:ICON.play;b.setAttribute("aria-label",V.playing?"Pause":"Play");
   try{if("mediaSession" in navigator)navigator.mediaSession.playbackState=V.playing?"playing":"paused"}catch(e){}
 }
-function halt(){V.token++;kkCancelQueued();clearTimeout(V.resumeT);if(V.cancel){const c=V.cancel;V.cancel=null;c()}try{if("speechSynthesis" in window)speechSynthesis.cancel()}catch(e){}}
+function halt(){V.token++;V.wstop=true;kkCancelQueued();clearTimeout(V.resumeT);if(V.cancel){const c=V.cancel;V.cancel=null;c()}try{if("speechSynthesis" in window)speechSynthesis.cancel()}catch(e){}}
 function voiceStop(msg){
   V.playing=false;halt();playUI();
   vStat(msg||(book?"Paused. Press play to continue.":""));
@@ -760,12 +824,13 @@ async function voiceLoop(tok,eng){
     }
     const i=V.idx,s=V.sents[i];mark(i);followPage();
     if(eng==="kk")kkPrefetch();
-    for(const ch of s.chunks){
+    for(let ci=0;ci<s.chunks.length;ci++){
+      const ch=s.chunks[ci];
       if(tok!==V.token)return;
-      try{await(eng==="kk"?kkSpeak(ch,tok):brSpeak(ch))}
+      try{await(eng==="kk"?kkSpeak(ch,tok,s,ci):brSpeak(ch,s,ci,tok))}
       catch(err){
         if(tok!==V.token)return;
-        if(eng==="kk"){V.noKokoro=true;eng="br";V.eng="br";fillVoiceSelect();vStat("The natural voice stopped working, so the browser voice takes over. ("+(err.message||err)+")");await brSpeak(ch)}
+        if(eng==="kk"){V.noKokoro=true;eng="br";V.eng="br";fillVoiceSelect();vStat("The natural voice stopped working, so the browser voice takes over. ("+(err.message||err)+")");await brSpeak(ch,s,ci,tok)}
         else{voiceStop("Speech failed: "+(err.message||err));return}
       }
     }
@@ -802,7 +867,8 @@ function voiceJump(i){
 }
 function voiceRestartIfPlaying(){if(V.playing){V.idx=Math.max(0,V.idx);const i=V.idx;halt();voicePlayFrom(i)}}
 function voicePlayFrom(i){V.idx=i;V.playing=true;(async()=>{const tok=V.token;const eng=await chooseEngine(tok);if(tok!==V.token)return;V.eng=eng;voiceLoop(tok,eng)})()}
-function voiceEngineChanged(){if(prefs.engine==="natural"){V.noKokoro=false;V.kkError=""}fillVoiceSelect();voiceRestartIfPlaying()}
+function kkReset(){if(KK.worker){KK.worker.terminate();KK.worker=null}KK.ready=null;KK.pending.clear();KK.cache.clear();KK.device="";KK.rtf=0;KK.n=0}
+function voiceEngineChanged(){if(KK.worker&&((prefs.gpu&&KK.device!=="webgpu")||(!prefs.gpu&&KK.device==="webgpu")))kkReset();if(V.open&&prefs.engine==="natural"&&!V.noKokoro)kkLoad().catch(()=>{});if(prefs.engine==="natural"){V.noKokoro=false;V.kkError=""}fillVoiceSelect();voiceRestartIfPlaying()}
 function voiceChapterChanged(){
   // called whenever a chapter is rendered; if the reader (not the voice) changed chapter while playing, restart there
   setDetached(false);
@@ -819,7 +885,7 @@ $("listenBtn").onclick=()=>{
   V.open=!V.open;$("voice").hidden=!V.open;$("listenBtn").setAttribute("aria-pressed",String(V.open));flow.classList.toggle("vmode",V.open);
   if(V.open){playUI();vStat("Press play, or click any sentence to start there. \u2190 \u2192 step by sentence, \u2191 replays.");if(V.sents.length){V.idx=firstOnPage();mark(V.idx)}
     if(prefs.engine==="natural"&&!V.noKokoro)kkLoad().then(()=>{if(V.open&&!V.playing)kkPrefetch()}).catch(()=>{})}   // download and warm up while the reader decides
-  else{voiceStop("");if(V.cur)V.cur.classList.remove("hl");V.cur=null;setDetached(false)}
+  else{voiceStop("");wordsClear();if(V.cur)V.cur.classList.remove("hl");V.cur=null;setDetached(false)}
   requestAnimationFrame(relayout);
 };
 if(!("speechSynthesis" in window)&&!window.Worker)$("listenBtn").remove();
@@ -834,15 +900,15 @@ function applyPrefs(){
   r.setProperty("--size",prefs.size+"px");r.setProperty("--measure",prefs.measure+"em");r.setProperty("--lh",prefs.lh);
   r.setProperty("--read",prefs.font==="sans"?"var(--font-ui)":"var(--font-read)");
   if(prefs.theme==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",prefs.theme);
-  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sGpu","gpu"],["sSpread","spread"],["sCols","cols"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
+  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sWh","wordHl"],["sGpu","gpu"],["sSpread","spread"],["sCols","cols"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
   store.set("marginalia.prefs",prefs);
-  flow.classList.toggle("nohl",!prefs.highlight);
+  flow.classList.toggle("nohl",!prefs.highlight);flow.classList.toggle("nowh",!prefs.wordHl);if(!prefs.wordHl)wordsClear();
   if(typeof fillVoiceSelect==="function")fillVoiceSelect();
   if(book)requestAnimationFrame(relayout);
 }
 $("sSize").onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs.size=Math.max(14,Math.min(32,prefs.size+Number(b.dataset.v)*2));applyPrefs()};
 const bool=v=>v==="true";
-[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sGpu","gpu",bool],["sSpread","spread",bool],["sCols","cols",Number]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine"||k==="gpu")voiceEngineChanged()});
+[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sWh","wordHl",bool],["sGpu","gpu",bool],["sSpread","spread",bool],["sCols","cols",Number]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine"||k==="gpu")voiceEngineChanged()});
 applyPrefs();
 
 loadCatalog();renderShelf();
