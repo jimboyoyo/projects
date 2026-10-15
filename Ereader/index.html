@@ -746,7 +746,20 @@ function ensureCtx(){
   if(!KK.ctx){try{KK.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){KK.ctx=null}}
   if(KK.ctx&&KK.ctx.state==="suspended")KK.ctx.resume().catch(()=>{});
 }
+function kkGpuFailed(){prefs.gpu=false;store.set("marginalia.prefs",prefs);applyPrefs();kkReset()}
 async function kkSpeak(text,tok,rec,ci){
+  try{return await kkSpeak1(text,tok,rec,ci)}
+  catch(err){
+    if(tok!==V.token)return;
+    if(KK.device==="webgpu"&&err.message!=="skipped"){      // the graphics driver reset or the GPU path failed: continue on the CPU
+      kkGpuFailed();vStat("The GPU stopped working, so the voice is restarting on the CPU\u2026");
+      await kkLoad();if(tok!==V.token)return;
+      V.baseStat=kkInfo();return kkSpeak1(text,tok,rec,ci);
+    }
+    throw err;
+  }
+}
+async function kkSpeak1(text,tok,rec,ci){
   const wait=setTimeout(()=>{if(tok===V.token)vStat("Preparing the next sentence\u2026")},600);
   let a;try{for(let t=0;;t++){try{a=await kkAudio(text);break}catch(err){if(err.message==='skipped'&&t<3&&tok===V.token){continue}throw err}}}finally{clearTimeout(wait)}
   if(tok!==V.token)return;

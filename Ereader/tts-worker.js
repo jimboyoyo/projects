@@ -19,6 +19,7 @@ let loadP = null;
 let latest = 0;          // newest epoch seen
 const queue = [];
 let busy = false;
+let curId = null;        // job being generated right now
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function load(wantGpu, voice) {
@@ -70,6 +71,7 @@ async function pump() {
       if (!job) break;
       if (job.epoch < latest) { postMessage({ type: "skipped", id: job.id }); continue; }
       postMessage({ type: "start", id: job.id });
+      curId = job.id;
       const t0 = performance.now();
       try {
         if (!tts) throw new Error("model not loaded");
@@ -79,6 +81,7 @@ async function pump() {
       } catch (err) {
         postMessage({ type: "error", id: job.id, message: String((err && err.message) || err) });
       }
+      curId = null;
     }
   } finally {
     busy = false;
@@ -99,3 +102,9 @@ self.onmessage = (e) => {
     pump();
   }
 };
+
+// A lost GPU device surfaces as an unhandled promise rejection inside the runtime, so the job would never finish.
+self.addEventListener("unhandledrejection", (e) => {
+  e.preventDefault();
+  if (curId != null) { const id = curId; curId = null; postMessage({ type: "error", id, message: "GPU device lost: " + String((e.reason && e.reason.message) || e.reason) }); }
+});
