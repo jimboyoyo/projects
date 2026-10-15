@@ -5,18 +5,20 @@
 <style>
 /* Layout: library shelf of spines/cards on top; full-bleed reader with sticky toolbar and chapter drawer. */
 :root{
-  --bg:#F2F4F0; --surface:#FFFFFF; --fg:#1B2230; --muted:#5E6A72; --line:#D5DAD3; --accent:#1F5F5B; --accent-fg:#FFFFFF; --mark:#E4EFEA; --hl:#CDE4DC;
+  --bg:#F2F4F0; --surface:#FFFFFF; --fg:#1B2230; --muted:#5E6A72; --line:#D5DAD3; --accent:#1F5F5B; --accent-fg:#FFFFFF; --mark:#E4EFEA; --hl:#CDE4DC; --spine:rgba(30,40,40,.13);
   --font-display:"Fraunces",Georgia,serif; --font-read:"Spectral",Georgia,serif; --font-ui:"Instrument Sans",system-ui,sans-serif;
   --size:20px; --measure:34em; --lh:1.65; --read:var(--font-read);
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161C;--surface:#1A2029;--fg:#DCE0D8;--muted:#8E9AA0;--line:#2B343E;--accent:#7CBDB4;--accent-fg:#0E1A19;--mark:#1F2B2B;--hl:#2E4A45;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#12161C;--surface:#1A2029;--fg:#DCE0D8;--muted:#8E9AA0;--line:#2B343E;--accent:#7CBDB4;--accent-fg:#0E1A19;--mark:#1F2B2B;--hl:#2E4A45;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161C;--surface:#1A2029;--fg:#DCE0D8;--muted:#8E9AA0;--line:#2B343E;--accent:#7CBDB4;--accent-fg:#0E1A19;--mark:#1F2B2B;--hl:#2E4A45;--spine:rgba(0,0,0,.45);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12161C;--surface:#1A2029;--fg:#DCE0D8;--muted:#8E9AA0;--line:#2B343E;--accent:#7CBDB4;--accent-fg:#0E1A19;--mark:#1F2B2B;--hl:#2E4A45;--spine:rgba(0,0,0,.45);color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:15px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wrap{max-width:68rem;margin:0 auto}
+.wrap.wide{max-width:none}
+.lib.wrap{width:100%}
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:10px 0;flex-wrap:wrap}
 .brand{font-family:var(--font-display);font-weight:700;font-size:1.25rem;letter-spacing:-.01em;margin-right:auto;background:none;border:0;padding:0}
 .btn{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 12px;font-weight:500}
@@ -50,7 +52,14 @@ a{color:var(--accent)}
 html.reading{overflow:hidden}
 .reader{display:grid;grid-template-columns:minmax(0,1fr)}
 #stage{position:relative;overflow:hidden;display:flex;justify-content:center;user-select:none;-webkit-user-select:none}
-#view{overflow:hidden;margin-block:18px}
+#paper{position:relative;flex:none}
+#view{position:absolute;overflow:hidden}
+#leaves{display:none;position:absolute;inset:0;box-shadow:0 2px 16px rgba(0,0,0,.10);border-radius:6px}
+#paper.book #leaves{display:flex}
+.leaf{flex:1;position:relative;background-color:var(--surface);border:1px solid var(--line);min-width:0}
+.leaf:first-child{border-right:0;border-radius:6px 0 0 6px;background-image:linear-gradient(to left,var(--spine),transparent 2.6em)}
+.leaf:last-child{border-left:0;border-radius:0 6px 6px 0;background-image:linear-gradient(to right,var(--spine),transparent 2.6em)}
+.leaf .pn{position:absolute;left:0;right:0;bottom:13px;text-align:center;font-family:var(--font-ui);font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums}
 #flow{height:100%;column-fill:auto;font-family:var(--read);font-size:var(--size);line-height:var(--lh);hyphens:auto;overflow-wrap:break-word;text-align:left;will-change:transform}
 @media (prefers-reduced-motion:no-preference){#flow{transition:transform .22s ease}}
 #flow .ch-kicker{font-family:var(--font-ui);font-size:.62em;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 .6em;break-after:avoid}
@@ -63,6 +72,8 @@ html.reading{overflow:hidden}
 #flow .s{border-radius:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 #flow .s.hl{background:var(--hl)}
 #flow.nohl .s.hl{background:none}
+#flow.vmode .s{cursor:pointer}
+#flow.vmode .s:hover:not(.hl){background:var(--mark)}
 #flow hr{border:0;text-align:center;margin:1em 0;color:var(--muted)}
 #flow hr::before{content:"\2022  \2022  \2022";letter-spacing:.4em}
 .prog{border-top:1px solid var(--line);padding:8px 0 4px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -98,7 +109,7 @@ html.reading{overflow:hidden}
 @media (prefers-reduced-motion:no-preference){.book{transition:border-color .15s}}
 </style>
 
-<header class="top"><div class="wrap" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:100%">
+<header class="top"><div class="wrap wide" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:100%">
   <button class="brand" id="home" type="button">Marginalia</button>
   <span class="title-line" id="tline" hidden></span>
   <button class="btn" id="listenBtn" type="button" aria-pressed="false" hidden>Listen</button>
@@ -106,8 +117,8 @@ html.reading{overflow:hidden}
   <button class="btn" id="setBtn" type="button">Aa</button>
 </div></header>
 
-<main class="wrap">
-<section class="lib" id="lib">
+<main>
+<section class="lib wrap" id="lib">
   <div>
     <h1>Read Project Gutenberg, one page at a time</h1>
     <p class="lede">Type a Gutenberg ID or pick a title. The book opens straight away, split into chapters and pages, and the reader remembers where you stopped.</p>
@@ -134,12 +145,13 @@ html.reading{overflow:hidden}
 </section>
 
 <section class="reader" id="reader" hidden>
-  <div id="stage"><div id="view"><div id="flow"></div></div></div>
+  <div id="stage"><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="flow"></div></div></div></div>
   <div id="foot">
   <div class="voice" id="voice" hidden>
-    <button class="btn" id="vPrev" type="button" aria-label="Previous sentence"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+    <button class="btn" id="vPrev" type="button" aria-label="Previous sentence" title="Previous sentence (←)"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
     <button class="btn main" id="vPlay" type="button" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg></button>
-    <button class="btn" id="vNext" type="button" aria-label="Next sentence"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+    <button class="btn" id="vNext" type="button" aria-label="Next sentence" title="Next sentence (→)"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+    <button class="btn" id="vRepeat" type="button" aria-label="Replay this sentence" title="Replay this sentence (↑ or R)"><svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg></button>
     <span class="stat" id="vStat" role="status">Press play to start reading aloud from this page.</span>
     <button class="btn txt" id="vFollow" type="button" hidden>Back to voice</button>
   </div>
@@ -161,6 +173,10 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Typeface</label><div class="seg" id="sFont"><button data-v="serif" type="button">Serif</button><button data-v="sans" type="button">Sans</button></div></div>
   <div class="ctl"><label>Line width</label><div class="seg" id="sMeasure"><button data-v="28" type="button">Narrow</button><button data-v="34" type="button">Medium</button><button data-v="42" type="button">Wide</button></div></div>
   <div class="ctl"><label>Line spacing</label><div class="seg" id="sLh"><button data-v="1.5" type="button">Tight</button><button data-v="1.65" type="button">Normal</button><button data-v="1.85" type="button">Loose</button></div></div>
+  <h3 style="margin-top:6px">Layout</h3>
+  <div class="ctl"><label>Pages shown</label><div class="seg" id="sSpread"><button data-v="false" type="button">Single page</button><button data-v="true" type="button">Two-page spread</button></div></div>
+  <div class="ctl"><label>Columns per page</label><div class="seg" id="sCols"><button data-v="1" type="button">1</button><button data-v="2" type="button">2</button><button data-v="3" type="button">3</button></div></div>
+  <p class="note" id="layNote"></p>
   <h3 style="margin-top:6px">Voice</h3>
   <div class="ctl"><label>Voice engine</label><div class="seg" id="sEngine"><button data-v="natural" type="button">Natural</button><button data-v="browser" type="button">Browser</button></div></div>
   <div class="ctl"><label for="vSel">Voice</label><select id="vSel"></select></div>
@@ -460,19 +476,38 @@ function fillChapter(){
   });
   document.querySelectorAll("#toc button").forEach((b,j)=>b.setAttribute("aria-current",j===book.pos.c));
 }
+let LP=1,LC=1,leaves=1;
 function layout(){
   // size the stage to the space left under the header and above the footer
   const prog=$("foot"),rootPad=parseFloat(getComputedStyle(document.documentElement).paddingBottom)||0;
   const top=stage.getBoundingClientRect().top;
   const H=Math.max(200,Math.floor(innerHeight-top-prog.offsetHeight-rootPad-6));
   stage.style.height=H+"px";
-  const sw=stage.clientWidth,mpx=prefs.measure*prefs.size;
-  const cols=sw>=2*mpx+gap+40?2:1;
-  gap=cols===2?Math.max(40,Math.round(prefs.size*2.4)):0;
-  pageW=Math.min(sw,Math.round(cols*mpx+(cols-1)*gap));
-  view.style.width=pageW+"px";view.style.height=(H-36)+"px";
-  flow.style.width=pageW+"px";flow.style.columnCount=cols;flow.style.columnGap=gap+"px";
-  pages=Math.max(1,Math.round((flow.scrollWidth+gap)/(pageW+gap)));
+  // pick a layout that fits: P pages per screen, C text columns per page; step down when the screen is too narrow
+  const sw=stage.clientWidth,size=prefs.size,minCol=Math.round(13*size),base=prefs.measure*size;
+  let P=prefs.spread?2:1,C=prefs.cols,N,G,colW;
+  for(;;){
+    N=P*C;
+    G=N===1?0:Math.round((P===2?3.4:2.4)*size);
+    const T=C===1?base:Math.round(base*0.72);
+    const room=P===2?sw/N-G:(sw-(N-1)*G)/N;
+    colW=Math.floor(Math.min(T,room));
+    if(colW>=minCol||N===1)break;
+    if(C>1)C--;else P=1;
+  }
+  LP=P;LC=C;gap=G;
+  pageW=N*colW+(N-1)*G;
+  const book2=P===2,paperW=book2?pageW+G:pageW,vTop=book2?26:18,vBot=book2?44:18;
+  const paper=$("paper");paper.style.width=paperW+"px";paper.style.height=H+"px";paper.classList.toggle("book",book2);
+  view.style.left=(book2?Math.round(G/2):0)+"px";view.style.top=vTop+"px";view.style.width=pageW+"px";view.style.height=(H-vTop-vBot)+"px";
+  flow.style.width=pageW+"px";flow.style.columnCount=N;flow.style.columnGap=G+"px";
+  // count the columns that hold text, from where the last element ends
+  const fr=flow.getBoundingClientRect(),last=flow.lastElementChild;let tc=1;
+  if(last){const rs=last.getClientRects(),r=rs[rs.length-1];if(r)tc=Math.max(1,Math.floor((r.right-fr.left-1)/(colW+G))+1)}
+  pages=Math.max(1,Math.ceil(tc/N-1e-3));leaves=Math.max(1,Math.ceil(tc/C-1e-3));
+  const ln=$("layNote");
+  if(ln){let m=(P===2?"Two pages":"One page")+", "+C+(C===1?" column":" columns")+(P===2?" each":"")+".";
+    if(P<(prefs.spread?2:1)||C<prefs.cols)m+=" Your window is too narrow for the full setting, so it was reduced.";ln.textContent=m}
 }
 function showChapter(i,frac){
   i=Math.max(0,Math.min(book.chapters.length-1,i));book.pos.c=i;
@@ -493,7 +528,9 @@ function updateUI(){
   const done=(before+book.wc[c]*(page+1)/pages)/book.total;
   $("pbar").style.width=(Math.min(1,done)*100).toFixed(1)+"%";
   $("chl").textContent=Math.round(Math.min(1,done)*100)+"% of book";
-  $("pgl").textContent="Page "+(page+1)+" of "+pages+" · ch. "+(c+1)+"/"+book.chapters.length;
+  const la=page*LP+1,lb=Math.min(la+LP-1,leaves);
+  $("pgl").textContent=(la>=lb?"Page "+Math.min(la,leaves)+" of "+leaves:"Pages "+la+"\u2013"+lb+" of "+leaves)+" · ch. "+(c+1)+"/"+book.chapters.length;
+  document.querySelectorAll("#leaves .pn").forEach((el,k)=>{const n=page*LP+k+1;el.textContent=n<=leaves?n:""});
   const mins=Math.max(0,Math.round(book.total*(1-done)/230));
   $("left").textContent=(mins>=60?Math.floor(mins/60)+" h "+(mins%60)+" min":mins+" min")+" left";
   $("prev").disabled=c===0&&page===0;$("next").disabled=c===book.chapters.length-1&&page===pages-1;
@@ -503,31 +540,45 @@ $("next").onclick=next;$("prev").onclick=prev;
 stage.addEventListener("click",e=>{
   if(!$("drawer").hidden||!$("sheet").hidden)return;
   const r=stage.getBoundingClientRect(),x=(e.clientX-r.left)/r.width;
-  if(V.open&&x>=0.3&&x<=0.7){const sp=e.target.closest&&e.target.closest(".s");if(sp){voiceJump(Number(sp.dataset.i));return}}
+  if(V.open){const sp=e.target.closest&&e.target.closest(".s");if(sp){voiceJump(Number(sp.dataset.i));return}}
   if(x<0.3)prev();else if(x>0.7)next();
 });
 let tx0=null;
 stage.addEventListener("touchstart",e=>{tx0=e.touches[0].clientX},{passive:true});
 stage.addEventListener("touchend",e=>{if(tx0==null)return;const dx=e.changedTouches[0].clientX-tx0;tx0=null;if(Math.abs(dx)>50){e.preventDefault();dx<0?next():prev()}});
+// after a mouse or touch click, hand the keyboard back to the page so Space and the arrow keys control reading
+document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("button");if(b&&e.detail>0)b.blur()});
 addEventListener("keydown",e=>{
-  if($("reader").hidden||/INPUT|SELECT|TEXTAREA/.test((e.target||{}).tagName||""))return;
-  if(e.key===" "&&V.open){e.preventDefault();voiceToggle()}
-  else if(e.key==="ArrowRight"||e.key==="PageDown"||e.key===" "){e.preventDefault();next()}
-  else if(e.key==="ArrowLeft"||e.key==="PageUp"){e.preventDefault();prev()}
-  else if(e.key==="]")showChapter(book.pos.c+1,0);
+  const tag=(e.target||{}).tagName||"";
+  if($("reader").hidden||/INPUT|SELECT|TEXTAREA/.test(tag)||e.metaKey||e.ctrlKey||e.altKey)return;
+  if(e.key===" "&&tag==="BUTTON")return;                 // space on a focused button presses it
+  if(V.open){
+    if(e.key===" "){e.preventDefault();voiceToggle();return}
+    if(e.key==="ArrowLeft"){e.preventDefault();voiceSeek(-1);return}
+    if(e.key==="ArrowRight"){e.preventDefault();voiceSeek(1);return}
+    if(e.key==="ArrowUp"||e.key==="r"||e.key==="R"){e.preventDefault();voiceReplay();return}
+    if(e.key==="ArrowDown"){e.preventDefault();voiceSeek(1);return}
+    if(e.key==="PageDown"){e.preventDefault();next();return}
+    if(e.key==="PageUp"){e.preventDefault();prev();return}
+  }else if(e.key==="ArrowRight"||e.key==="PageDown"||e.key===" "){e.preventDefault();next();return}
+  else if(e.key==="ArrowLeft"||e.key==="PageUp"){e.preventDefault();prev();return}
+  if(e.key==="]")showChapter(book.pos.c+1,0);
   else if(e.key==="[")showChapter(book.pos.c-1,0);
   else if(e.key==="Escape")closeAll();
 });
 function relayout(){
   if(!book||$("reader").hidden)return;
-  const f=book.pos.f,key=innerWidth+"x"+innerHeight+"|"+prefs.size+prefs.font+prefs.measure+prefs.lh;
-  layout();goPage(Math.min(pages-1,Math.floor(f*pages+1e-6)),true);lastSize=key;
+  const anchor=V.sents.length?V.sents[firstOnPage()]:null,f=book.pos.f;
+  layout();
+  let p=Math.min(pages-1,Math.floor(f*pages+1e-6));
+  if(anchor)p=pageOf(anchor.el);
+  goPage(p,true);
 }
 let rt=null;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(relayout,150)});
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>setTimeout(relayout,50));
-$("home").onclick=async()=>{if(book)await putBook(book);book=null;voiceStop("");V.open=false;$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
+$("home").onclick=async()=>{if(book)await putBook(book);book=null;voiceStop("");V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
 
-const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,gpu:!!navigator.gpu},store.get("marginalia.prefs",{}));
+const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,gpu:!!navigator.gpu},store.get("marginalia.prefs",{}));
 /* ---------- voice reader ---------- */
 const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noKokoro:false,detached:false};
 const KK={worker:null,ready:null,pending:new Map(),nid:1,cache:new Map(),ctx:null,device:""};
@@ -651,7 +702,7 @@ function playUI(){
   const b=$("vPlay");b.innerHTML=V.playing?ICON.pause:ICON.play;b.setAttribute("aria-label",V.playing?"Pause":"Play");
   try{if("mediaSession" in navigator)navigator.mediaSession.playbackState=V.playing?"playing":"paused"}catch(e){}
 }
-function halt(){V.token++;if(V.cancel){const c=V.cancel;V.cancel=null;c()}try{if("speechSynthesis" in window)speechSynthesis.cancel()}catch(e){}}
+function halt(){V.token++;clearTimeout(V.resumeT);if(V.cancel){const c=V.cancel;V.cancel=null;c()}try{if("speechSynthesis" in window)speechSynthesis.cancel()}catch(e){}}
 function voiceStop(msg){
   V.playing=false;halt();playUI();
   vStat(msg||(book?"Paused. Press play to continue.":""));
@@ -697,11 +748,25 @@ async function voiceLoop(tok,eng){
     V.idx=i+1;
   }
 }
-function voiceSeek(d){
-  if(!V.sents.length)return;
-  const was=V.playing;V.idx=Math.max(0,Math.min(V.sents.length-1,V.idx+d));mark(V.idx);setDetached(false);followPage();
-  if(was){halt();V.playing=true;const tok=V.token;voiceLoop(tok,V.eng)}
+function resumeSoon(){
+  // step keys can be pressed several times in a row: stop speaking now, start again once the presses settle
+  halt();V.playing=true;playUI();const tok=V.token;
+  V.resumeT=setTimeout(()=>{if(tok===V.token)voiceLoop(tok,V.eng||"br")},V.eng==="kk"?260:180);
 }
+function voiceSeek(d){
+  if(!book||!V.sents.length)return;
+  let n=V.idx+d;
+  if(n<0){
+    if(book.pos.c>0){V.enterAt="last";showChapter(book.pos.c-1,"last");followPage();return}
+    n=0;
+  }else if(n>=V.sents.length){
+    if(book.pos.c<book.chapters.length-1){showChapter(book.pos.c+1,0);followPage();return}
+    n=V.sents.length-1;
+  }
+  V.idx=n;mark(n);setDetached(false);followPage();
+  if(V.playing)resumeSoon();
+}
+function voiceReplay(){if(V.sents.length)voiceJump(Math.min(V.idx,V.sents.length-1))}
 function voiceJump(i){
   if(!V.sents[i])return;
   V.idx=i;mark(i);setDetached(false);
@@ -714,16 +779,18 @@ function voiceEngineChanged(){if(prefs.engine==="natural"){V.noKokoro=false;V.kk
 function voiceChapterChanged(){
   // called whenever a chapter is rendered; if the reader (not the voice) changed chapter while playing, restart there
   setDetached(false);
-  if(V.playing){const tok=V.token;halt();V.playing=true;V.idx=0;mark(0);voiceLoop(V.token,V.eng||"br")}
-  else if(V.open&&V.sents.length)mark(0);
+  const start=V.enterAt==="last"?Math.max(0,V.sents.length-1):0;V.enterAt=null;
+  if(V.playing){halt();V.playing=true;V.idx=start;mark(start);voiceLoop(V.token,V.eng||"br")}
+  else if(V.open&&V.sents.length){V.idx=start;mark(start)}
   if(!V.open&&V.cur){V.cur.classList.remove("hl")}
 }
 $("vPlay").onclick=voiceToggle;
 $("vPrev").onclick=()=>voiceSeek(-1);
 $("vNext").onclick=()=>voiceSeek(1);
+$("vRepeat").onclick=voiceReplay;
 $("listenBtn").onclick=()=>{
-  V.open=!V.open;$("voice").hidden=!V.open;$("listenBtn").setAttribute("aria-pressed",String(V.open));
-  if(V.open){playUI();vStat("Press play to start reading aloud from this page.");if(V.sents.length){V.idx=firstOnPage();mark(V.idx)}}
+  V.open=!V.open;$("voice").hidden=!V.open;$("listenBtn").setAttribute("aria-pressed",String(V.open));flow.classList.toggle("vmode",V.open);
+  if(V.open){playUI();vStat("Press play, or click any sentence to start there. \u2190 \u2192 step by sentence, \u2191 replays.");if(V.sents.length){V.idx=firstOnPage();mark(V.idx)}}
   else{voiceStop("");if(V.cur)V.cur.classList.remove("hl");V.cur=null;setDetached(false)}
   requestAnimationFrame(relayout);
 };
@@ -739,7 +806,7 @@ function applyPrefs(){
   r.setProperty("--size",prefs.size+"px");r.setProperty("--measure",prefs.measure+"em");r.setProperty("--lh",prefs.lh);
   r.setProperty("--read",prefs.font==="sans"?"var(--font-ui)":"var(--font-read)");
   if(prefs.theme==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",prefs.theme);
-  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sGpu","gpu"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
+  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sGpu","gpu"],["sSpread","spread"],["sCols","cols"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
   store.set("marginalia.prefs",prefs);
   flow.classList.toggle("nohl",!prefs.highlight);
   if(typeof fillVoiceSelect==="function")fillVoiceSelect();
@@ -747,7 +814,7 @@ function applyPrefs(){
 }
 $("sSize").onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs.size=Math.max(14,Math.min(32,prefs.size+Number(b.dataset.v)*2));applyPrefs()};
 const bool=v=>v==="true";
-[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sGpu","gpu",bool]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine"||k==="gpu")voiceEngineChanged()});
+[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sGpu","gpu",bool],["sSpread","spread",bool],["sCols","cols",Number]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine"||k==="gpu")voiceEngineChanged()});
 applyPrefs();
 
 loadCatalog();renderShelf();
