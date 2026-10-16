@@ -230,6 +230,8 @@ html.reading{overflow:hidden}
   <p class="note">The natural voice is a one-time download kept in your browser: about 90 MB, or about 330 MB with GPU, which is much faster. Each voice also fetches a small file the first time you use it. The browser voice needs no download.</p>
   <h3 style="margin-top:6px">Lookup</h3>
   <p class="note">Select a word or passage in the book and choose &ldquo;Ask Claude&rdquo; for a short explanation. This uses your own Anthropic API key (from the Claude Console), so lookups are paid from your own credits.</p>
+  <div class="ctl"><label for="sLang">Claude language</label><select id="sLang"><option value="auto">Same as the book</option><option value="sv">Svenska</option><option value="en">English</option><option value="other">Other&hellip;</option></select></div>
+  <div class="ctl" id="sLangOtherRow" hidden><label for="sLangOther">Language</label><input class="key" id="sLangOther" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="e.g. Norsk, Deutsch, Espa&ntilde;ol"></div>
   <div class="ctl"><label for="sKey">API key</label><input class="key" id="sKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-&hellip;"></div>
   <div class="ctl"><div class="seg"><button id="sKeySave" type="button">Save key</button><button id="sKeyClear" type="button">Remove key</button></div></div>
   <div class="ctl"><label for="sModel">Model</label><input class="key" id="sModel" type="text" autocomplete="off" spellcheck="false"></div>
@@ -644,7 +646,7 @@ let rt=null;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(relayo
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>setTimeout(relayout,50));
 $("home").onclick=async()=>{if(book)await putBook(book);bubClose();lfSet(false,true,true);$("lineBtn").hidden=true;book=null;voiceStop("");wordsClear();V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
 
-const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,wordHl:true,gpu:false,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,v:2},store.get("marginalia.prefs",{}));
+const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,wordHl:true,gpu:false,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,claudeLang:"auto",claudeLangOther:"",v:2},store.get("marginalia.prefs",{}));
 if((prefs.v||0)<2){prefs.gpu=false;prefs.v=2}   // GPU was on by default before; it is slow to start and unreliable for this model, so CPU is now the default
 /* ---------- voice reader ---------- */
 const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noKokoro:false,detached:false};
@@ -1158,7 +1160,14 @@ function contextFor(info){
   if(i>=0)for(let k=Math.max(0,i-1);k<=Math.min(V.sents.length-1,i+1);k++){const t=V.sents[k].el.textContent;parts.push(t)}
   return {ctx:parts.join(" ").slice(0,1400),i};
 }
-function lkKey(c,sel){return book.id+"|"+c+"|"+prefs.model+"|"+sel}
+function langInstruction(){
+  const l=prefs.claudeLang;
+  if(l==="sv")return "Write your answer in Swedish (svenska).";
+  if(l==="en")return "Write your answer in English.";
+  if(l==="other"){const o=(prefs.claudeLangOther||"").replace(/[^\p{L}\p{M}\s'()\-]/gu,"").replace(/\s+/g," ").trim().slice(0,40);if(o)return "Write your answer in "+o+".";}
+  return "Write your answer in the same language as the book text you are given (for example Swedish for a book written in Swedish).";
+}
+function lkKey(c,sel){return book.id+"|"+c+"|"+prefs.model+"|"+langInstruction()+"|"+sel}
 function cacheGet(k){const m=store.get("marginalia.lk",{});return m[k]}
 function cachePut(k,v){const m=store.get("marginalia.lk",{});delete m[k];m[k]=v;const ks=Object.keys(m);while(ks.length>150)delete m[ks.shift()];store.set("marginalia.lk",m)}
 async function streamAnswer(payload,onText,signal){
@@ -1211,7 +1220,7 @@ async function runLookup(info){
   const ch=book.chapters[c];
   const user="Book: \""+book.title+"\""+(book.author?" by "+book.author:"")+"\nChapter: "+(ch?ch.title:"")+"\n\nText around the selection:\n<<<\n"+ctx+"\n>>>\n\nSelected text:\n<<<\n"+sel+"\n>>>\n\nExplain the selected text.";
   try{
-    const out=await streamAnswer({system:SYSTEM,user},t=>{if(LK.cur===mine){mine.a=t;setBub({...base,a:t})}},ctl.signal);
+    const out=await streamAnswer({system:SYSTEM+" "+langInstruction(),user},t=>{if(LK.cur===mine){mine.a=t;setBub({...base,a:t})}},ctl.signal);
     if(LK.cur!==mine)return;
     mine.a=out.trim();cachePut(ck,mine.a);setBub({...base,a:mine.a,canPin:true,pinned:false});
   }catch(err){
@@ -1263,6 +1272,11 @@ function renderNotes(){
 function keyNote(){$("keyNote").textContent=getKey()?"A key is saved in this browser.":"No key saved yet."}
 $("sKeySave").onclick=()=>{if(saveKey($("sKey").value))$("sKey").value=""};
 $("sKeyClear").onclick=()=>{store.set("marginalia.apikey","");$("sKey").value="";keyNote()};
+function langUI(){$("sLang").value=prefs.claudeLang;$("sLangOtherRow").hidden=prefs.claudeLang!=="other";$("sLangOther").value=prefs.claudeLangOther||""}
+$("sLang").onchange=()=>{prefs.claudeLang=$("sLang").value;store.set("marginalia.prefs",prefs);langUI();if(prefs.claudeLang==="other")$("sLangOther").focus()};
+$("sLangOther").oninput=()=>{prefs.claudeLangOther=$("sLangOther").value;store.set("marginalia.prefs",prefs)};
+$("sLangOther").addEventListener("keydown",e=>e.stopPropagation());
+langUI();
 $("sModel").value=prefs.model;$("sModel").onchange=()=>{prefs.model=$("sModel").value.trim()||"claude-haiku-5-5";$("sModel").value=prefs.model;store.set("marginalia.prefs",prefs)};
 $("sKey").addEventListener("keydown",e=>e.stopPropagation());
 keyNote();
