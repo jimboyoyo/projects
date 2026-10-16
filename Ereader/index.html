@@ -4,6 +4,14 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=Instrument+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap">
 <style>
+/* ---------- line focus ---------- */
+#lfBar,#lfDim{position:absolute;left:0;top:0;pointer-events:none;border-radius:6px}
+#lfBar{background:rgba(255,216,74,.5);background:color-mix(in srgb,var(--lfc,#FFD84A) var(--lfa,55%),transparent);transition:transform .09s ease-out,height .09s ease-out}
+#lfDim{box-shadow:0 0 0 100vmax rgba(242,244,240,.78);box-shadow:0 0 0 100vmax color-mix(in srgb,var(--bg) 78%,transparent);z-index:2}
+@media (prefers-reduced-motion:reduce){#lfBar{transition:none!important}}
+.lfrow{display:flex;align-items:center;gap:10px;padding:6px 0 0;font-size:.82rem;color:var(--muted)}
+.lfrow .txt{flex:1;min-width:0}
+#lineBtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 /* ---------- lookup bubble ---------- */
 #flow .s.noted{text-decoration:underline dotted var(--accent);text-decoration-thickness:1.5px;text-underline-offset:4px}
 .pill{position:fixed;z-index:30;background:var(--accent);color:var(--accent-fg);border:0;border-radius:999px;padding:6px 14px;font-size:.85rem;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25)}
@@ -30,12 +38,12 @@
 
 /* Layout: library shelf of spines/cards on top; full-bleed reader with sticky toolbar and chapter drawer. */
 :root{
-  --bg:#F2F4F0; --surface:#FFFFFF; --fg:#1B2230; --muted:#5E6A72; --line:#D5DAD3; --accent:#1F5F5B; --accent-fg:#FFFFFF; --mark:#E4EFEA; --hl:#CDE4DC; --spine:rgba(30,40,40,.13);
+  --bg:#F2F4F0; --surface:#FFFFFF; --fg:#1B2230; --muted:#5E6A72; --line:#D5DAD3; --accent:#1F5F5B; --accent-fg:#FFFFFF; --mark:#E4EFEA; --hl:#CDE4DC; --spine:rgba(30,40,40,.13); --lfa:55%;
   --font-display:"Fraunces",Georgia,serif; --font-read:"Spectral",Georgia,serif; --font-ui:"Instrument Sans",system-ui,sans-serif;
   --size:20px; --measure:34em; --lh:1.65; --read:var(--font-read);
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161C;--surface:#1A2029;--fg:#DCE0D8;--muted:#8E9AA0;--line:#2B343E;--accent:#7CBDB4;--accent-fg:#0E1A19;--mark:#1F2B2B;--hl:#2E4A45;--spine:rgba(0,0,0,.45);color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#12161C;--surface:#1A2029;--fg:#DCE0D8;--muted:#8E9AA0;--line:#2B343E;--accent:#7CBDB4;--accent-fg:#0E1A19;--mark:#1F2B2B;--hl:#2E4A45;--spine:rgba(0,0,0,.45);color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161C;--surface:#1A2029;--fg:#DCE0D8;--muted:#8E9AA0;--line:#2B343E;--accent:#7CBDB4;--accent-fg:#0E1A19;--mark:#1F2B2B;--hl:#2E4A45;--spine:rgba(0,0,0,.45);--lfa:34%;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12161C;--surface:#1A2029;--fg:#DCE0D8;--muted:#8E9AA0;--line:#2B343E;--accent:#7CBDB4;--accent-fg:#0E1A19;--mark:#1F2B2B;--hl:#2E4A45;--spine:rgba(0,0,0,.45);--lfa:34%;color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:15px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
 button,input,select{font:inherit;color:inherit}
@@ -141,6 +149,7 @@ html.reading{overflow:hidden}
 <header class="top"><div class="wrap wide" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;width:100%">
   <button class="brand" id="home" type="button">Marginalia</button>
   <span class="title-line" id="tline" hidden></span>
+  <button class="btn" id="lineBtn" type="button" aria-pressed="false" title="Line focus: highlight the line you are reading" hidden>Line focus</button>
   <button class="btn" id="listenBtn" type="button" aria-pressed="false" hidden>Listen</button>
   <button class="btn" id="tocBtn" type="button" hidden>Contents</button>
   <button class="btn" id="setBtn" type="button">Aa</button>
@@ -174,8 +183,9 @@ html.reading{overflow:hidden}
 </section>
 
 <section class="reader" id="reader" hidden>
-  <div id="stage"><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="flow"></div></div></div></div>
+  <div id="stage"><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="lfBar" hidden></div><div id="flow"></div><div id="lfDim" hidden></div></div></div></div>
   <div id="foot">
+  <div class="lfrow" id="lfRow" hidden><span class="txt" id="lfTxt" role="status"></span><button class="btn" id="lfUp" type="button" aria-label="Previous line" hidden>&#9650;</button><button class="btn" id="lfDn" type="button" aria-label="Next line" hidden>&#9660;</button></div>
   <div class="voice" id="voice" hidden>
     <button class="btn" id="vPrev" type="button" aria-label="Previous sentence" title="Previous sentence (←)"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
     <button class="btn main" id="vPlay" type="button" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg></button>
@@ -202,6 +212,10 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Typeface</label><div class="seg" id="sFont"><button data-v="serif" type="button">Serif</button><button data-v="sans" type="button">Sans</button></div></div>
   <div class="ctl"><label>Line width</label><div class="seg" id="sMeasure"><button data-v="28" type="button">Narrow</button><button data-v="34" type="button">Medium</button><button data-v="42" type="button">Wide</button></div></div>
   <div class="ctl"><label>Line spacing</label><div class="seg" id="sLh"><button data-v="1.5" type="button">Tight</button><button data-v="1.65" type="button">Normal</button><button data-v="1.85" type="button">Loose</button></div></div>
+  <h3 style="margin-top:6px">Line focus</h3>
+  <div class="ctl"><label>Highlight colour</label><div class="seg" id="sLfc"><button data-v="yellow" type="button">Yellow</button><button data-v="green" type="button">Green</button><button data-v="blue" type="button">Blue</button><button data-v="pink" type="button">Pink</button></div></div>
+  <div class="ctl"><label>Dim the rest of the page</label><div class="seg" id="sLfd"><button data-v="false" type="button">Off</button><button data-v="true" type="button">On</button></div></div>
+  <p class="note">Switch on with the Line focus button in the header. Move the pointer to highlight a line, click to lock it, then use the arrow keys to move it. Esc releases the lock.</p>
   <h3 style="margin-top:6px">Layout</h3>
   <div class="ctl"><label>Pages shown</label><div class="seg" id="sSpread"><button data-v="false" type="button">Single page</button><button data-v="true" type="button">Two-page spread</button></div></div>
   <div class="ctl"><label>Columns per page</label><div class="seg" id="sCols"><button data-v="1" type="button">1</button><button data-v="2" type="button">2</button><button data-v="3" type="button">3</button></div></div>
@@ -441,7 +455,7 @@ const flow=$("flow"),view=$("view"),stage=$("stage");
 function openBook(b){
   book=b;b.opened=Date.now();putBook(b);
   $("lib").hidden=true;$("reader").hidden=false;document.documentElement.classList.add("reading");
-  $("tline").hidden=false;$("tocBtn").hidden=false;$("listenBtn").hidden=false;
+  $("tline").hidden=false;$("tocBtn").hidden=false;$("listenBtn").hidden=false;$("lineBtn").hidden=false;lfSet(!!prefs.lineFocus,true);
   $("tline").textContent=b.title+(b.author?" — "+b.author:"");
   b.notes=b.notes||[];buildToc();renderNotes();scrollTo(0,0);showChapter(b.pos.c,b.pos.f);
 }
@@ -514,10 +528,11 @@ function fillChapter(){
     afterBreak=false;flow.append(e);
   });
   document.querySelectorAll("#toc button").forEach((b,j)=>b.setAttribute("aria-current",j===book.pos.c));
-  markNotes();
+  markNotes();LF.lines=null;LF.cur=-1;LF.hover=-1;
 }
 let LP=1,LC=1,leaves=1;
 function layout(){
+  lfInvalidate();
   // size the stage to the space left under the header and above the footer
   const prog=$("foot"),rootPad=parseFloat(getComputedStyle(document.documentElement).paddingBottom)||0;
   const top=stage.getBoundingClientRect().top;
@@ -560,7 +575,7 @@ function goPage(p,instant){
   page=Math.max(0,Math.min(pages-1,p));
   if(instant){const t=flow.style.transition;flow.style.transition="none";flow.style.transform="translateX("+(-page*(pageW+gap))+"px)";void flow.offsetWidth;flow.style.transition=t}
   else flow.style.transform="translateX("+(-page*(pageW+gap))+"px)";
-  book.pos.f=pages>1?page/pages:0;updateUI();voicePageChanged();
+  book.pos.f=pages>1?page/pages:0;updateUI();voicePageChanged();lfAfterPage();
 }
 function next(){if(!book)return;userNav();if(page<pages-1)goPage(page+1);else if(book.pos.c<book.chapters.length-1)showChapter(book.pos.c+1,0)}
 function prev(){if(!book)return;userNav();if(page>0)goPage(page-1);else if(book.pos.c>0)showChapter(book.pos.c-1,"last")}
@@ -585,6 +600,7 @@ stage.addEventListener("click",e=>{
   if(hasSel()||e.detail>1)return;                       // selecting text (drag or double-click) is not a page turn
   const r=stage.getBoundingClientRect(),x=(e.clientX-r.left)/r.width;
   const sp=e.target.closest&&e.target.closest(".s");
+  if(LF.on){lfClick(e);if(V.open&&sp)voiceJump(Number(sp.dataset.i));return}   // in line focus a click locks the line instead of turning the page
   if(V.open){if(sp){voiceJump(Number(sp.dataset.i));return}}
   else if(sp&&sp.classList.contains("noted")){openNoteFor(sp);return}
   if(x<0.3||x>0.7){turnT=setTimeout(()=>{if(!hasSel())x<0.3?prev():next()},V.open?0:230)}   // short wait so a double-click can select a word instead
@@ -598,6 +614,10 @@ addEventListener("keydown",e=>{
   const tag=(e.target||{}).tagName||"";
   if($("reader").hidden||/INPUT|SELECT|TEXTAREA/.test(tag)||e.metaKey||e.ctrlKey||e.altKey)return;
   if(e.key===" "&&tag==="BUTTON")return;                 // space on a focused button presses it
+  if(LF.on&&LF.locked){
+    if(e.key==="ArrowDown"||e.key==="ArrowRight"){e.preventDefault();lfStep(1);return}
+    if(e.key==="ArrowUp"||e.key==="ArrowLeft"){e.preventDefault();lfStep(-1);return}
+  }
   if(V.open){
     if(e.key===" "){e.preventDefault();voiceToggle();return}
     if(e.key==="ArrowLeft"){e.preventDefault();voiceSeek(-1);return}
@@ -610,7 +630,7 @@ addEventListener("keydown",e=>{
   else if(e.key==="ArrowLeft"||e.key==="PageUp"){e.preventDefault();prev();return}
   if(e.key==="]")showChapter(book.pos.c+1,0);
   else if(e.key==="[")showChapter(book.pos.c-1,0);
-  else if(e.key==="Escape"){if(bubShown())bubClose(true);else closeAll()}
+  else if(e.key==="Escape"){if(bubShown())bubClose(true);else if(LF.on&&LF.locked)lfUnlock();else closeAll()}
 });
 function relayout(){
   if(!book||$("reader").hidden)return;
@@ -622,9 +642,9 @@ function relayout(){
 }
 let rt=null;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(relayout,150)});
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>setTimeout(relayout,50));
-$("home").onclick=async()=>{if(book)await putBook(book);bubClose();book=null;voiceStop("");wordsClear();V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
+$("home").onclick=async()=>{if(book)await putBook(book);bubClose();lfSet(false,true,true);$("lineBtn").hidden=true;book=null;voiceStop("");wordsClear();V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
 
-const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,wordHl:true,gpu:false,model:"claude-haiku-5-5",v:2},store.get("marginalia.prefs",{}));
+const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,wordHl:true,gpu:false,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,v:2},store.get("marginalia.prefs",{}));
 if((prefs.v||0)<2){prefs.gpu=false;prefs.v=2}   // GPU was on by default before; it is slow to start and unreliable for this model, so CPU is now the default
 /* ---------- voice reader ---------- */
 const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noKokoro:false,detached:false};
@@ -965,6 +985,112 @@ if(!("speechSynthesis" in window)&&!window.Worker)$("listenBtn").remove();
 
 /* ---------- panels and settings ---------- */
 
+/* ---------- line focus: a reading ruler that keeps the eye on one line ---------- */
+const LF={on:false,locked:false,lines:null,cur:-1,hover:-1,frac:0,relocate:false,pend:null,lastPage:-1,step:1,colW:1,N:1,lh:30};
+const lfBar=$("lfBar"),lfDim=$("lfDim");
+const LFC={yellow:"#FFD84A",green:"#8FD694",blue:"#8CC8FF",pink:"#FFA8C8"};
+function lfInvalidate(){                     // the layout changed: line positions are stale, but remember roughly where the lock was
+  if(LF.lines&&LF.cur>=0){LF.frac=LF.cur/LF.lines.length;LF.relocate=true}
+  LF.lines=null;LF.hover=-1;
+}
+function lfCompute(){
+  if(LF.lines)return LF.lines;
+  const N=Math.max(1,LP*LC),colW=(pageW-(N-1)*gap)/N,step=colW+gap,lh=prefs.lh*prefs.size,fr=flow.getBoundingClientRect();
+  const rects=[],tw=document.createTreeWalker(flow,NodeFilter.SHOW_TEXT),rg=document.createRange();
+  while(tw.nextNode()){
+    const n=tw.currentNode;if(!/\S/.test(n.nodeValue))continue;
+    rg.selectNodeContents(n);
+    for(const r of rg.getClientRects()){
+      if(r.width<1||r.height<1||r.height>lh*1.7)continue;      // skips the tall drop cap
+      const t=r.top-fr.top;
+      rects.push({l:r.left-fr.left,r:r.right-fr.left,t,b:t+r.height,cy:t+r.height/2,h:r.height,col:Math.floor((r.left-fr.left+r.width/2)/step)});
+    }
+  }
+  rects.sort((a,b)=>a.col-b.col||a.cy-b.cy);
+  const lines=[];
+  for(const r of rects){
+    const L=lines[lines.length-1];
+    if(L&&L.col===r.col&&Math.abs(r.cy-L.cy)<Math.max(L.h,r.h)*0.45){
+      L.l=Math.min(L.l,r.l);L.r=Math.max(L.r,r.r);L.t=Math.min(L.t,r.t);L.b=Math.max(L.b,r.b);L.h=Math.max(L.h,r.h);L.cy=(L.t+L.b)/2;
+    }else lines.push({col:r.col,l:r.l,r:r.r,t:r.t,b:r.b,h:r.h,cy:r.cy});
+  }
+  lines.forEach(L=>{L.page=Math.floor(L.col/N)});
+  LF.step=step;LF.colW=colW;LF.N=N;LF.lh=lh;LF.lines=lines;
+  return lines;
+}
+function lfPlace(i){
+  const lines=lfCompute(),L=lines[i];
+  if(!L){lfBar.hidden=true;lfDim.hidden=true;return}
+  const h=Math.max(LF.lh,L.h*1.25),x=L.col*LF.step-page*(pageW+gap)-6,y=L.cy-h/2,w=LF.colW+12;
+  lfBar.style.transitionDuration=(LF.lastPage!==page&&LF.lastPage>=0)?".22s":"";LF.lastPage=page;
+  for(const el of [lfBar,lfDim]){el.hidden=false;el.style.width=w+"px";el.style.height=h+"px";el.style.transform="translate("+x+"px,"+y+"px)"}
+  lfDim.hidden=!prefs.lfDim;lfDim.style.transitionDuration=lfBar.style.transitionDuration;
+}
+function lfNearest(x,y){                      // x,y in flow coordinates; picks the closest line on the visible page
+  const lines=lfCompute(),N=LF.N;let best=-1,bd=1e9;
+  const c=Math.max(page*N,Math.min(page*N+N-1,Math.floor(x/LF.step)));
+  for(let i=0;i<lines.length;i++){
+    const L=lines[i];if(L.page!==page)continue;
+    const d=Math.abs(L.cy-y)+(L.col===c?0:1e5);
+    if(d<bd){bd=d;best=i}
+  }
+  return best;
+}
+function lfUI(){
+  const t=$("lfTxt");
+  $("lfUp").hidden=$("lfDn").hidden=!(LF.on&&LF.locked);
+  t.textContent=!LF.on?"":LF.locked?"Line locked. Arrow keys move it (↑ ↓ or ← →). Esc lets the pointer move it again.":"Line focus is on. Move the pointer over a line to highlight it, then click to lock it.";
+}
+function lfSet(on,quiet,teardown){
+  LF.on=on;LF.locked=false;LF.cur=-1;LF.hover=-1;LF.lastPage=-1;
+  $("lineBtn").setAttribute("aria-pressed",String(on));
+  $("lfRow").hidden=!on;
+  if(!on){lfBar.hidden=true;lfDim.hidden=true}else lfBar.hidden=true;
+  if(!teardown){prefs.lineFocus=on;store.set("marginalia.prefs",prefs)}
+  lfUI();
+  if(!quiet)relayout();
+}
+function lfLock(i){LF.locked=true;LF.cur=i;lfPlace(i);lfUI()}
+function lfUnlock(){LF.locked=false;LF.cur=-1;LF.hover=-1;lfBar.hidden=true;lfDim.hidden=true;lfUI()}
+function lfClick(e){
+  const fr=flow.getBoundingClientRect(),i=lfNearest(e.clientX-fr.left,e.clientY-fr.top);
+  if(i>=0)lfLock(i);
+}
+function lfStep(d){
+  const lines=lfCompute();if(!lines.length)return;
+  let i=LF.cur+d;
+  if(i>=lines.length){if(book.pos.c<book.chapters.length-1){LF.pend="first";showChapter(book.pos.c+1,0)}return}
+  if(i<0){if(book.pos.c>0){LF.pend="last";showChapter(book.pos.c-1,"last")}return}
+  LF.cur=i;const L=lines[i];
+  if(L.page!==page)goPage(L.page);
+  lfPlace(i);
+}
+function lfAfterPage(){
+  if(!LF.on||!book)return;
+  const lines=lfCompute();
+  if(!LF.locked){LF.hover=-1;lfBar.hidden=true;lfDim.hidden=true;return}
+  if(!lines.length){lfBar.hidden=true;lfDim.hidden=true;return}
+  let i=LF.cur;
+  if(LF.pend==="first")i=0;else if(LF.pend==="last")i=lines.length-1;
+  else if(LF.relocate)i=Math.min(lines.length-1,Math.round(LF.frac*lines.length));
+  LF.pend=null;LF.relocate=false;
+  if(i<0||i>=lines.length||lines[i].page!==page){i=lines.findIndex(L=>L.page===page);if(i<0)i=0}
+  LF.cur=i;lfPlace(i);
+}
+function lfApplyPrefs(){
+  document.documentElement.style.setProperty("--lfc",LFC[prefs.lfColor]||LFC.yellow);
+  if(LF.on&&LF.cur>=0&&(LF.locked||LF.hover>=0))lfPlace(LF.cur>=0&&LF.locked?LF.cur:LF.hover);
+  lfDim.hidden=!(LF.on&&!lfBar.hidden&&prefs.lfDim);
+}
+stage.addEventListener("mousemove",e=>{
+  if(!LF.on||LF.locked||!book||!$("drawer").hidden||!$("sheet").hidden)return;
+  const fr=flow.getBoundingClientRect(),i=lfNearest(e.clientX-fr.left,e.clientY-fr.top);
+  if(i>=0&&i!==LF.hover){LF.hover=i;lfPlace(i)}
+});
+stage.addEventListener("mouseleave",()=>{if(LF.on&&!LF.locked){LF.hover=-1;lfBar.hidden=true;lfDim.hidden=true}});
+$("lineBtn").onclick=()=>lfSet(!LF.on);
+$("lfUp").onclick=()=>lfStep(-1);$("lfDn").onclick=()=>lfStep(1);
+
 /* ---------- lookup: explain selected text with the Claude API ---------- */
 const API_URL="https://api.anthropic.com/v1/messages";
 const hasSel=()=>{const g=getSelection();return !!(g&&!g.isCollapsed&&g.toString().trim())};
@@ -1150,15 +1276,15 @@ function applyPrefs(){
   r.setProperty("--size",prefs.size+"px");r.setProperty("--measure",prefs.measure+"em");r.setProperty("--lh",prefs.lh);
   r.setProperty("--read",prefs.font==="sans"?"var(--font-ui)":"var(--font-read)");
   if(prefs.theme==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",prefs.theme);
-  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sWh","wordHl"],["sGpu","gpu"],["sSpread","spread"],["sCols","cols"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
+  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sWh","wordHl"],["sGpu","gpu"],["sSpread","spread"],["sCols","cols"],["sLfc","lfColor"],["sLfd","lfDim"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
   store.set("marginalia.prefs",prefs);
-  flow.classList.toggle("nohl",!prefs.highlight);flow.classList.toggle("nowh",!prefs.wordHl);if(!prefs.wordHl)wordsClear();
+  flow.classList.toggle("nohl",!prefs.highlight);flow.classList.toggle("nowh",!prefs.wordHl);lfApplyPrefs();if(!prefs.wordHl)wordsClear();
   if(typeof fillVoiceSelect==="function")fillVoiceSelect();
   if(book)requestAnimationFrame(relayout);
 }
 $("sSize").onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs.size=Math.max(14,Math.min(32,prefs.size+Number(b.dataset.v)*2));applyPrefs()};
 const bool=v=>v==="true";
-[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sWh","wordHl",bool],["sGpu","gpu",bool],["sSpread","spread",bool],["sCols","cols",Number]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine"||k==="gpu")voiceEngineChanged()});
+[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sWh","wordHl",bool],["sGpu","gpu",bool],["sSpread","spread",bool],["sCols","cols",Number],["sLfc","lfColor",String],["sLfd","lfDim",bool]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine"||k==="gpu")voiceEngineChanged()});
 applyPrefs();
 
 loadCatalog();renderShelf();
