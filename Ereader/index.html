@@ -1,14 +1,27 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font:14px system-ui,sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+
+</style>
+<!--fragment-start-->
 <title>Marginalia Reader</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23444'/%3E%3Cpath d='M9 8h14v16H9z' fill='none' stroke='%23fff' stroke-width='2'/%3E%3C/svg%3E">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;1,400&family=Instrument+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap">
 <style>
 /* ---------- line focus ---------- */
-#lfBar,#lfDim{position:absolute;left:0;top:0;pointer-events:none;border-radius:6px}
-#lfBar{background:rgba(255,216,74,.5);background:color-mix(in srgb,var(--lfc,#FFD84A) var(--lfa,55%),transparent);transition:transform .09s ease-out,height .09s ease-out}
+#lfBar,#lfDim,.lfx{position:absolute;left:0;top:0;pointer-events:none;border-radius:6px}
+#lfBar,.lfx{background:rgba(255,216,74,.5);background:color-mix(in srgb,var(--lfc,#FFD84A) var(--lfa,55%),transparent);transition:transform .09s ease-out,height .09s ease-out}
+.lfx{pointer-events:none;border-radius:6px}
 #lfDim{box-shadow:0 0 0 100vmax rgba(242,244,240,.78);box-shadow:0 0 0 100vmax color-mix(in srgb,var(--bg) 78%,transparent);z-index:2}
-@media (prefers-reduced-motion:reduce){#lfBar{transition:none!important}}
+@media (prefers-reduced-motion:reduce){#lfBar,.lfx{transition:none!important}}
 .lfrow{display:flex;align-items:center;gap:10px;padding:6px 0 0;font-size:.82rem;color:var(--muted)}
 .lfrow .txt{flex:1;min-width:0}
 #lineBtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
@@ -197,7 +210,7 @@ html.reading{overflow:hidden}
 </section>
 
 <section class="reader" id="reader" hidden>
-  <div id="stage"><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="lfBar" hidden></div><div id="flow"></div><div id="lfDim" hidden></div></div><div id="ribbon" hidden></div></div></div>
+  <div id="stage"><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="lfBar" hidden></div><div id="lfExt"></div><div id="flow"></div><div id="lfDim" hidden></div></div><div id="ribbon" hidden></div></div></div>
   <div id="foot">
   <div class="lfrow" id="lfRow" hidden><span class="txt" id="lfTxt" role="status"></span><button class="btn" id="lfUp" type="button" aria-label="Previous line" hidden>&#9650;</button><button class="btn" id="lfDn" type="button" aria-label="Next line" hidden>&#9660;</button></div>
   <div class="voice" id="voice" hidden>
@@ -228,6 +241,7 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Line spacing</label><div class="seg" id="sLh"><button data-v="1.5" type="button">Tight</button><button data-v="1.65" type="button">Normal</button><button data-v="1.85" type="button">Loose</button></div></div>
   <h3 style="margin-top:6px">Line focus</h3>
   <div class="ctl"><label>Highlight colour</label><div class="seg" id="sLfc"><button data-v="yellow" type="button">Yellow</button><button data-v="green" type="button">Green</button><button data-v="blue" type="button">Blue</button><button data-v="pink" type="button">Pink</button></div></div>
+  <div class="ctl"><label>Extend highlight (lines above and below, fading)</label><div class="seg" id="sLfx"><button data-v="0" type="button">Off</button><button data-v="1" type="button">1</button><button data-v="2" type="button">2</button><button data-v="3" type="button">3</button></div></div>
   <div class="ctl"><label>Dim the rest of the page</label><div class="seg" id="sLfd"><button data-v="false" type="button">Off</button><button data-v="true" type="button">On</button></div></div>
   <p class="note">Switch on with the Line focus button in the header. Move the pointer to highlight a line, click to lock it, then use the arrow keys to move it. Esc releases the lock.</p>
   <h3 style="margin-top:6px">Layout</h3>
@@ -663,7 +677,7 @@ let rt=null;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(relayo
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>setTimeout(relayout,50));
 $("home").onclick=async()=>{if(book)await putBook(book);bubClose();lfSet(false,true,true);$("lineBtn").hidden=true;$("bmBtn").hidden=true;$("ribbon").hidden=true;book=null;voiceStop("");wordsClear();V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
 
-const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,wordHl:true,gpu:false,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,claudeLang:"auto",claudeLangOther:"",v:2},store.get("marginalia.prefs",{}));
+const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,wordHl:true,gpu:false,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,lfExt:0,claudeLang:"auto",claudeLangOther:"",v:2},store.get("marginalia.prefs",{}));
 if((prefs.v||0)<2){prefs.gpu=false;prefs.v=2}   // GPU was on by default before; it is slow to start and unreliable for this model, so CPU is now the default
 /* ---------- voice reader ---------- */
 const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noKokoro:false,detached:false};
@@ -1039,12 +1053,24 @@ function lfCompute(){
 }
 function lfPlace(i){
   const lines=lfCompute(),L=lines[i];
-  if(!L){lfBar.hidden=true;lfDim.hidden=true;return}
+  if(!L){lfBar.hidden=true;lfDim.hidden=true;lfExtClear();return}
   const h=Math.max(LF.lh,L.h*1.25),x=L.col*LF.step-page*(pageW+gap)-6,y=L.cy-h/2,w=LF.colW+12;
   lfBar.style.transitionDuration=(LF.lastPage!==page&&LF.lastPage>=0)?".22s":"";LF.lastPage=page;
   for(const el of [lfBar,lfDim]){el.hidden=false;el.style.width=w+"px";el.style.height=h+"px";el.style.transform="translate("+x+"px,"+y+"px)"}
+  /* extended lines: neighbours in the same column, each fainter than the one before */
+  const n=Math.max(0,Math.min(3,Number(prefs.lfExt)||0)),ext=[];let top=y,bot=y+h;
+  for(let k=1;k<=n;k++)for(const d of [-1,1]){
+    const M=lines[i+d*k];if(!M||M.col!==L.col||M.page!==page)continue;
+    const mh=Math.max(LF.lh,M.h*1.25),my=M.cy-mh/2;top=Math.min(top,my);bot=Math.max(bot,my+mh);
+    ext.push({y:my,h:mh,f:1-k/(n+1)});
+  }
+  const box=$("lfExt");while(box.children.length<ext.length){const e=document.createElement("div");e.className="lfx";box.append(e)}
+  [...box.children].forEach((e,j)=>{const E=ext[j];if(!E){e.hidden=true;return}
+    e.hidden=false;e.style.transitionDuration=lfBar.style.transitionDuration;e.style.width=w+"px";e.style.height=E.h+"px";e.style.opacity=E.f;e.style.transform="translate("+x+"px,"+E.y+"px)"});
+  if(prefs.lfDim&&ext.length){lfDim.style.height=(bot-top)+"px";lfDim.style.transform="translate("+x+"px,"+top+"px)"}
   lfDim.hidden=!prefs.lfDim;lfDim.style.transitionDuration=lfBar.style.transitionDuration;
 }
+function lfExtClear(){[...$("lfExt").children].forEach(e=>e.hidden=true)}
 function lfNearest(x,y){                      // x,y in flow coordinates; picks the closest line on the visible page
   const lines=lfCompute(),N=LF.N;let best=-1,bd=1e9;
   const c=Math.max(page*N,Math.min(page*N+N-1,Math.floor(x/LF.step)));
@@ -1064,13 +1090,13 @@ function lfSet(on,quiet,teardown){
   LF.on=on;LF.locked=false;LF.cur=-1;LF.hover=-1;LF.lastPage=-1;
   $("lineBtn").setAttribute("aria-pressed",String(on));
   $("lfRow").hidden=!on;
-  if(!on){lfBar.hidden=true;lfDim.hidden=true}else lfBar.hidden=true;
+  if(!on){lfBar.hidden=true;lfDim.hidden=true;lfExtClear()}else lfBar.hidden=true;
   if(!teardown){prefs.lineFocus=on;store.set("marginalia.prefs",prefs)}
   lfUI();
   if(!quiet)relayout();
 }
 function lfLock(i){LF.locked=true;LF.cur=i;lfPlace(i);lfUI()}
-function lfUnlock(){LF.locked=false;LF.cur=-1;LF.hover=-1;lfBar.hidden=true;lfDim.hidden=true;lfUI()}
+function lfUnlock(){LF.locked=false;LF.cur=-1;LF.hover=-1;lfBar.hidden=true;lfDim.hidden=true;lfExtClear();lfUI()}
 function lfClick(e){
   const fr=flow.getBoundingClientRect(),i=lfNearest(e.clientX-fr.left,e.clientY-fr.top);
   if(i>=0)lfLock(i);
@@ -1087,8 +1113,8 @@ function lfStep(d){
 function lfAfterPage(){
   if(!LF.on||!book)return;
   const lines=lfCompute();
-  if(!LF.locked){LF.hover=-1;lfBar.hidden=true;lfDim.hidden=true;return}
-  if(!lines.length){lfBar.hidden=true;lfDim.hidden=true;return}
+  if(!LF.locked){LF.hover=-1;lfBar.hidden=true;lfDim.hidden=true;lfExtClear();return}
+  if(!lines.length){lfBar.hidden=true;lfDim.hidden=true;lfExtClear();return}
   let i=LF.cur;
   if(LF.pend==="first")i=0;else if(LF.pend==="last")i=lines.length-1;
   else if(LF.relocate)i=Math.min(lines.length-1,Math.round(LF.frac*lines.length));
@@ -1106,7 +1132,7 @@ stage.addEventListener("mousemove",e=>{
   const fr=flow.getBoundingClientRect(),i=lfNearest(e.clientX-fr.left,e.clientY-fr.top);
   if(i>=0&&i!==LF.hover){LF.hover=i;lfPlace(i)}
 });
-stage.addEventListener("mouseleave",()=>{if(LF.on&&!LF.locked){LF.hover=-1;lfBar.hidden=true;lfDim.hidden=true}});
+stage.addEventListener("mouseleave",()=>{if(LF.on&&!LF.locked){LF.hover=-1;lfBar.hidden=true;lfDim.hidden=true;lfExtClear()}});
 $("lineBtn").onclick=()=>lfSet(!LF.on);
 $("lfUp").onclick=()=>lfStep(-1);$("lfDn").onclick=()=>lfStep(1);
 
@@ -1451,7 +1477,7 @@ function applyPrefs(){
   r.setProperty("--size",prefs.size+"px");r.setProperty("--measure",prefs.measure+"em");r.setProperty("--lh",prefs.lh);
   r.setProperty("--read",prefs.font==="sans"?"var(--font-ui)":"var(--font-read)");
   if(prefs.theme==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",prefs.theme);
-  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sWh","wordHl"],["sGpu","gpu"],["sSpread","spread"],["sCols","cols"],["sLfc","lfColor"],["sLfd","lfDim"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
+  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sWh","wordHl"],["sGpu","gpu"],["sSpread","spread"],["sCols","cols"],["sLfc","lfColor"],["sLfd","lfDim"],["sLfx","lfExt"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
   store.set("marginalia.prefs",prefs);
   flow.classList.toggle("nohl",!prefs.highlight);flow.classList.toggle("nowh",!prefs.wordHl);lfApplyPrefs();if(!prefs.wordHl)wordsClear();
   if(typeof fillVoiceSelect==="function")fillVoiceSelect();
@@ -1459,11 +1485,11 @@ function applyPrefs(){
 }
 $("sSize").onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs.size=Math.max(14,Math.min(32,prefs.size+Number(b.dataset.v)*2));applyPrefs()};
 const bool=v=>v==="true";
-[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sWh","wordHl",bool],["sGpu","gpu",bool],["sSpread","spread",bool],["sCols","cols",Number],["sLfc","lfColor",String],["sLfd","lfDim",bool]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine"||k==="gpu")voiceEngineChanged()});
+[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sWh","wordHl",bool],["sGpu","gpu",bool],["sSpread","spread",bool],["sCols","cols",Number],["sLfc","lfColor",String],["sLfd","lfDim",bool],["sLfx","lfExt",Number]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine"||k==="gpu")voiceEngineChanged()});
 applyPrefs();
 
 loadCatalog();renderShelf();
 })();
 </script>
-
-</body></html>
+</body>
+</html>
