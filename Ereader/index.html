@@ -42,6 +42,25 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 #fnBand .fnp b{color:var(--fg);font-weight:600}
 #fnBand .fnp sup{color:var(--accent);font-weight:600;margin-right:.3em;font-size:.85em}
 #wlCopy{margin:2px 0 6px}
+.lb{position:fixed;inset:0;z-index:50;background:rgba(10,14,18,.62);display:flex;align-items:center;justify-content:center;padding:16px}
+.lb[hidden]{display:none}
+.lbc{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;width:min(860px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.4);font-family:var(--font-ui)}
+.lbh{display:flex;gap:8px;padding:12px;border-bottom:1px solid var(--line);align-items:center}
+.lbh form{display:flex;gap:6px;flex:1;min-width:0}
+.lbh input[type=search]{flex:1;min-width:0;font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.lbs{padding:8px 14px;font-size:.85rem;color:var(--muted);min-height:1.2em}
+.lbg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:4px 14px 14px;overflow:auto}
+.lbg button{all:unset;cursor:pointer;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}
+.lbg button:focus-visible{outline:2px solid var(--accent)}
+.lbg img{width:100%;height:130px;object-fit:cover;background:var(--line)}
+.lbg span{font-size:.78rem;padding:5px 8px;line-height:1.25}
+.lbbig{padding:4px 14px 14px;overflow:auto;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.lbbig[hidden],.lbg[hidden]{display:none}
+.lbbig img{max-width:100%;max-height:52vh;object-fit:contain;align-self:center;border-radius:6px}
+.lbbig p{margin:0;font-size:.9rem;line-height:1.4}
+.lbbig a,.lbf a{color:var(--accent)}
+.lbf{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:10px 14px;border-top:1px solid var(--line);font-size:.82rem;color:var(--muted)}
+.lbf label{display:flex;gap:5px;align-items:center}
 #wlTip{position:fixed;z-index:35;max-width:min(300px,86vw);background:var(--fg);color:var(--bg);padding:6px 11px;border-radius:8px;font-family:var(--font-ui);font-size:.85rem;line-height:1.35;box-shadow:0 4px 16px rgba(0,0,0,.3);pointer-events:none}
 #wlTip b{font-weight:600}
 .bmodes{display:flex;gap:4px;margin:0 0 7px;flex-wrap:wrap}
@@ -280,7 +299,14 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Theme</label><div class="seg" id="sTheme"><button data-v="auto" type="button">Auto</button><button data-v="light" type="button">Light</button><button data-v="dark" type="button">Dark</button></div></div>
 </aside>
 
-<div class="pill" id="askPill" role="toolbar" aria-label="Selected text" hidden><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="analysis">Analyse</button><span class="sep"></span><button type="button" data-m="bookmark" title="Bookmark this passage">Bookmark</button><button type="button" data-m="word" title="Add this word to the wordlist with a footnote" hidden>Add to wordlist</button></div>
+<div class="pill" id="askPill" role="toolbar" aria-label="Selected text" hidden><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="analysis">Analyse</button><button type="button" data-m="images" title="Look up pictures of this" hidden>Images</button><span class="sep"></span><button type="button" data-m="bookmark" title="Bookmark this passage">Bookmark</button><button type="button" data-m="word" title="Add this word to the wordlist with a footnote" hidden>Add to wordlist</button></div>
+<div class="lb" id="imgBox" hidden role="dialog" aria-modal="true" aria-label="Pictures"><div class="lbc">
+  <div class="lbh"><form id="imgForm"><input id="imgQ" type="search" aria-label="Search term" autocomplete="off"><button class="btn" type="submit">Search</button></form><button class="btn" id="imgX" type="button" aria-label="Close">×</button></div>
+  <div class="lbs" id="imgStatus" role="status"></div>
+  <div class="lbg" id="imgGrid"></div>
+  <div class="lbbig" id="imgBig" hidden><button class="btn" id="imgBack" type="button">← Back to results</button><img id="imgBigImg" alt=""><p id="imgCap"></p><a id="imgSrc" target="_blank" rel="noopener noreferrer">Read more on Wikipedia ↗</a></div>
+  <div class="lbf"><a id="imgG" target="_blank" rel="noopener noreferrer">Search Google Images ↗</a><label><input type="checkbox" id="imgT"> Add the book title to the Google search</label><span>Pictures from Wikipedia</span></div>
+</div></div>
 <div id="wlTip" role="tooltip" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
 <div class="bub above" id="bub" role="dialog" aria-label="Explanation" hidden><span class="tail"></span><div class="bq" id="bq"></div><div class="bmodes" id="bModes"><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="analysis">Literary analysis</button></div><div class="ba" id="ba"></div><div class="keyrow" id="bKeyRow" hidden><input id="bKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-&hellip;"><button id="bKeySave" type="button">Save</button></div><div class="bf" id="bf"><button id="bBm" type="button" hidden>Remove bookmark</button><button id="bPin" type="button">Pin to margin</button><button id="bCopy" type="button">Copy</button><button id="bX" type="button" aria-label="Close">Close</button></div></div>
@@ -655,6 +681,7 @@ stage.addEventListener("touchend",e=>{if(tx0==null)return;const dx=e.changedTouc
 // after a mouse or touch click, hand the keyboard back to the page so Space and the arrow keys control reading
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("button");if(b&&e.detail>0)b.blur()});
 addEventListener("keydown",e=>{
+  if(!$("imgBox").hidden)return;
   const tag=(e.target||{}).tagName||"";
   if($("reader").hidden||/INPUT|SELECT|TEXTAREA/.test(tag)||e.metaKey||e.ctrlKey||e.altKey)return;
   if(e.key===" "&&tag==="BUTTON")return;                 // space on a focused button presses it
@@ -1259,6 +1286,7 @@ function updatePill(){
   const info=selectionInfo();
   if(!info||info.text.length>600){pill.hidden=true;return}
   const last=info.rects[info.rects.length-1];
+  pill.querySelector("[data-m=images]").hidden=info.text.length>60;
   pill.querySelector("[data-m=word]").hidden=!(info.anchor&&info.anchor.s0===info.anchor.s1&&/^[^\p{L}]*\p{L}[\p{L}'’\-]*[^\p{L}]*$/u.test(info.text));
   pill.hidden=false;const pw=pill.offsetWidth||270;
   const below=last.bottom+44<innerHeight;
@@ -1366,7 +1394,7 @@ async function runLookup(info,mode){
 pill.addEventListener("click",e=>{
   const b=e.target.closest("button");if(!b)return;
   const info=selectionInfo();if(!info)return;
-  if(b.dataset.m==="bookmark")addPassageBookmark(info);else if(b.dataset.m==="word")addWord(info);else runLookup(info,b.dataset.m);
+  if(b.dataset.m==="bookmark")addPassageBookmark(info);else if(b.dataset.m==="word")addWord(info);else if(b.dataset.m==="images")openImages(info.text);else runLookup(info,b.dataset.m);
 });
 $("bModes").addEventListener("click",e=>{const b=e.target.closest("button");if(!b||!LK.info)return;runLookup(LK.info,b.dataset.m)});
 function saveKey(v){v=(v||"").trim();if(!v)return false;store.set("marginalia.apikey",v);keyNote();return true}
@@ -1503,6 +1531,54 @@ async function addWord(info){
   }
   putBook(book);fnRender();renderWordlist();
 }
+/* picture lookup: article images from Wikipedia in a lightbox, plus a link out to Google Images (no Claude call, no cost) */
+const IMG={ctl:null,q:"",items:[],cache:new Map()};
+function imgWiki(){return prefs.claudeLang==="sv"?"sv":"en"}
+function imgGoogle(){
+  let q=$("imgQ").value.trim();if($("imgT").checked){const t=(fixIdTitle(book),(book.title||"").trim());if(t&&!/^(pg)?\d+$/i.test(t))q+=" "+t}
+  $("imgG").href="https://www.google.com/search?tbm=isch&safe=active&q="+encodeURIComponent(q);
+}
+function openImages(text){
+  bubClose(true);
+  const q=text.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,"").slice(0,80);
+  $("imgQ").value=q;$("imgT").checked=/^\p{Lu}/u.test(q);
+  $("imgBox").hidden=false;imgBack();imgGoogle();imgSearch(q);$("imgQ").blur();$("imgX").focus();
+}
+function imgClose(){if(IMG.ctl)try{IMG.ctl.abort()}catch(e){}$("imgBox").hidden=true}
+function imgBack(){$("imgBig").hidden=true;$("imgGrid").hidden=false}
+async function imgSearch(q){
+  q=q.trim();const st=$("imgStatus"),grid=$("imgGrid");grid.textContent="";imgBack();imgGoogle();
+  if(!q){st.textContent="Type a word or name to search for.";return}
+  if(IMG.ctl)try{IMG.ctl.abort()}catch(e){}
+  const ctl=IMG.ctl=new AbortController(),key=imgWiki()+"|"+q.toLowerCase();let items=IMG.cache.get(key);
+  if(!items){
+    st.textContent="Looking for pictures…";
+    try{
+      const u="https://"+imgWiki()+".wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrlimit=12&gsrsearch="+encodeURIComponent(q)+"&prop=pageimages|extracts&piprop=thumbnail&pithumbsize=800&exintro=1&explaintext=1&exsentences=2&exlimit=max";
+      const res=await fetch(u,{signal:ctl.signal});if(!res.ok)throw new Error("HTTP "+res.status);
+      const j=await res.json(),pages=Object.values((j.query&&j.query.pages)||{});
+      items=pages.filter(p=>p.thumbnail&&p.thumbnail.source).sort((a,b)=>a.index-b.index).slice(0,8).map(p=>({title:p.title,text:(p.extract||"").trim(),src:p.thumbnail.source,url:"https://"+imgWiki()+".wikipedia.org/wiki/"+encodeURIComponent(p.title.replace(/ /g,"_"))}));
+      IMG.cache.set(key,items);
+    }catch(err){
+      if(err.name==="AbortError")return;
+      st.textContent="Could not load pictures from Wikipedia. You can still use the Google Images link below.";return;
+    }
+  }
+  if(IMG.ctl!==ctl)return;
+  if(!items.length){st.textContent="No pictures found. Some words are hard to show in a picture; try Define or Explain, or search Google Images below.";return}
+  st.textContent="Pictures from Wikipedia articles. Click one to enlarge.";
+  items.forEach(it=>{
+    const b=document.createElement("button"),im=document.createElement("img"),cp=document.createElement("span");
+    b.type="button";im.src=it.src;im.alt=it.title;im.loading="lazy";im.referrerPolicy="no-referrer";cp.textContent=it.title;b.append(im,cp);
+    b.onclick=()=>{$("imgBigImg").src=it.src;$("imgBigImg").alt=it.title;$("imgCap").textContent=it.title+(it.text?" — "+it.text:"");$("imgSrc").href=it.url;grid.hidden=true;$("imgBig").hidden=false;$("imgBack").focus()};
+    grid.append(b);
+  });
+}
+$("imgForm").addEventListener("submit",e=>{e.preventDefault();imgSearch($("imgQ").value)});
+$("imgQ").addEventListener("input",imgGoogle);$("imgT").addEventListener("change",imgGoogle);
+$("imgX").onclick=imgClose;$("imgBack").onclick=imgBack;
+$("imgBox").addEventListener("mousedown",e=>{if(e.target===$("imgBox"))imgClose()});
+$("imgBox").addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();if(!$("imgBig").hidden)imgBack();else imgClose()}});
 function wlTipHide(){$("wlTip").hidden=true}
 function wlTipShow(m){
   const w=wordsOf().find(x=>x.id===Number(m.dataset.id));if(!w||!w.def||!bub.hidden)return;
