@@ -52,7 +52,7 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 .lbg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:4px 14px 14px;overflow:auto}
 .lbg button{all:unset;cursor:pointer;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}
 .lbg button:focus-visible{outline:2px solid var(--accent)}
-.lbg img{width:100%;height:130px;object-fit:cover;background:var(--line)}
+.lbg img{width:100%;height:130px;object-fit:cover;background:var(--line);font-size:.72rem;color:var(--muted)}
 .lbg span{font-size:.78rem;padding:5px 8px;line-height:1.25}
 .lbbig{padding:4px 14px 14px;overflow:auto;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 .lbbig[hidden],.lbg[hidden]{display:none}
@@ -1532,7 +1532,20 @@ async function addWord(info){
   putBook(book);fnRender();renderWordlist();
 }
 /* picture lookup: article images from Wikipedia in a lightbox, plus a link out to Google Images (no Claude call, no cost) */
-const IMG={ctl:null,q:"",items:[],cache:new Map()};
+const IMG={ctl:null,q:"",items:[],cache:new Map(),blobs:new Map()};
+/* Load a picture as a blob over CORS first: that works even when the page is cross-origin isolated (which can block plain <img> loads from other sites). If that fails, fall back to a normal image load. */
+async function imgBlob(src){
+  if(IMG.blobs.has(src))return IMG.blobs.get(src);
+  const r=await fetch(src,{mode:"cors",credentials:"omit"});if(!r.ok)throw new Error("HTTP "+r.status);
+  const u=URL.createObjectURL(await r.blob());
+  if(IMG.blobs.size>40){IMG.blobs.forEach(v=>URL.revokeObjectURL(v));IMG.blobs.clear()}
+  IMG.blobs.set(src,u);return u;
+}
+function imgFill(im,it,done){
+  let fell=false;
+  const direct=()=>{if(fell)return;fell=true;im.onerror=()=>{im.alt=it.title+" (picture could not load)";im.classList.add("bad")};im.src=it.src};
+  imgBlob(it.src).then(u=>{im.onerror=direct;im.src=u;it.shown=u;if(done)done(u)}).catch(direct);
+}
 function imgWiki(){return prefs.claudeLang==="sv"?"sv":"en"}
 function imgGoogle(){
   let q=$("imgQ").value.trim();if($("imgT").checked){const t=(fixIdTitle(book),(book.title||"").trim());if(t&&!/^(pg)?\d+$/i.test(t))q+=" "+t}
@@ -1569,8 +1582,8 @@ async function imgSearch(q){
   st.textContent="Pictures from Wikipedia articles. Click one to enlarge.";
   items.forEach(it=>{
     const b=document.createElement("button"),im=document.createElement("img"),cp=document.createElement("span");
-    b.type="button";im.src=it.src;im.alt=it.title;im.loading="lazy";im.referrerPolicy="no-referrer";cp.textContent=it.title;b.append(im,cp);
-    b.onclick=()=>{$("imgBigImg").src=it.src;$("imgBigImg").alt=it.title;$("imgCap").textContent=it.title+(it.text?" — "+it.text:"");$("imgSrc").href=it.url;grid.hidden=true;$("imgBig").hidden=false;$("imgBack").focus()};
+    b.type="button";im.alt=it.title;cp.textContent=it.title;b.append(im,cp);imgFill(im,it);
+    b.onclick=()=>{$("imgBigImg").src=it.shown||it.src;$("imgBigImg").alt=it.title;$("imgCap").textContent=it.title+(it.text?" — "+it.text:"");$("imgSrc").href=it.url;grid.hidden=true;$("imgBig").hidden=false;$("imgBack").focus()};
     grid.append(b);
   });
 }
