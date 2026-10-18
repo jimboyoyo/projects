@@ -27,7 +27,7 @@ img{max-width:100%}
 #lineBtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 /* ---------- lookup bubble ---------- */
 #flow .s.noted{text-decoration:underline dotted var(--accent);text-decoration-thickness:1.5px;text-underline-offset:4px}
-.pill{position:fixed;z-index:30;display:flex;align-items:center;gap:2px;background:var(--accent);color:var(--accent-fg);border-radius:999px;padding:3px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.pill{position:fixed;z-index:30;display:flex;flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 16px);align-items:center;gap:2px;background:var(--accent);color:var(--accent-fg);border-radius:999px;padding:3px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
 .pill button{all:unset;box-sizing:border-box;color:var(--accent-fg);padding:5px 11px;border-radius:999px;font-size:.82rem;cursor:pointer;white-space:nowrap}
 .pill button:hover,.pill button:focus-visible{background:rgba(255,255,255,.22)}
 .pill .sep{width:1px;height:16px;background:currentColor;opacity:.35;margin:0 3px}
@@ -304,7 +304,7 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Theme</label><div class="seg" id="sTheme"><button data-v="auto" type="button">Auto</button><button data-v="light" type="button">Light</button><button data-v="dark" type="button">Dark</button></div></div>
 </aside>
 
-<div class="pill" id="askPill" role="toolbar" aria-label="Selected text" hidden><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="analysis">Analyse</button><button type="button" data-m="images" title="Look up pictures of this" hidden>Images</button><span class="sep"></span><button type="button" data-m="bookmark" title="Bookmark this passage">Bookmark</button><button type="button" data-m="word" title="Add this word to the wordlist with a footnote" hidden>Add to wordlist</button></div>
+<div class="pill" id="askPill" role="toolbar" aria-label="Selected text" hidden><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="simplify" title="Rewrite this in simpler words">Simplify</button><button type="button" data-m="analysis">Analyse</button><button type="button" data-m="images" title="Look up pictures of this" hidden>Images</button><span class="sep"></span><button type="button" data-m="bookmark" title="Bookmark this passage">Bookmark</button><button type="button" data-m="word" title="Add this word to the wordlist with a footnote" hidden>Add to wordlist</button></div>
 <div class="lb" id="imgBox" hidden role="dialog" aria-modal="true" aria-label="Pictures"><div class="lbc">
   <div class="lbh"><form id="imgForm"><input id="imgQ" type="search" aria-label="Search term" autocomplete="off"><button class="btn" type="submit">Search</button></form><button class="btn" id="imgX" type="button" aria-label="Close">×</button></div>
   <div class="lbt" id="imgTabs" role="tablist" aria-label="Picture source"></div>
@@ -315,7 +315,7 @@ html.reading{overflow:hidden}
 </div></div>
 <div id="wlTip" role="tooltip" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
-<div class="bub above" id="bub" role="dialog" aria-label="Explanation" hidden><span class="tail"></span><div class="bq" id="bq"></div><div class="bmodes" id="bModes"><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="analysis">Literary analysis</button></div><div class="ba" id="ba"></div><div class="keyrow" id="bKeyRow" hidden><input id="bKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-&hellip;"><button id="bKeySave" type="button">Save</button></div><div class="bf" id="bf"><button id="bBm" type="button" hidden>Remove bookmark</button><button id="bPin" type="button">Pin to margin</button><button id="bCopy" type="button">Copy</button><button id="bX" type="button" aria-label="Close">Close</button></div></div>
+<div class="bub above" id="bub" role="dialog" aria-label="Explanation" hidden><span class="tail"></span><div class="bq" id="bq"></div><div class="bmodes" id="bModes"><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="simplify">Simplify</button><button type="button" data-m="analysis">Literary analysis</button></div><div class="ba" id="ba"></div><div class="keyrow" id="bKeyRow" hidden><input id="bKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-&hellip;"><button id="bKeySave" type="button">Save</button></div><div class="bf" id="bf"><button id="bBm" type="button" hidden>Remove bookmark</button><button id="bPin" type="button">Pin to margin</button><button id="bCopy" type="button">Copy</button><button id="bX" type="button" aria-label="Close">Close</button></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 (function(){
@@ -1347,6 +1347,7 @@ const BASE="You are a reading companion inside an ebook reader. The reader has s
 const MODES={
   define:{max:300,task:"Define the selected text.",sys:"Define the selected word or phrase as it is used in this passage, in one or two easy sentences, as you would to a 13-year-old. Start with what it means here, using simpler words than the one you are defining. If it is old-fashioned, say so and name the everyday word we use now. If it is a name, say who or what it is. Add a very short example only if it really helps. At most 40 words."},
   explain:{max:500,task:"Explain the selected text.",sys:"Explain what the selection means here, as if telling a friend your own age who got stuck. For a word, say what it means in simple words and mention if it is old-fashioned. For a name or reference, say who or what it is. For a longer passage, retell it in plain modern words and say what is going on. About 60 words at most."},
+  simplify:{max:800,task:"Rewrite the selected text in simpler language.",sys:"Rewrite the selected text so a student who finds the original too hard can read it easily. Keep the same meaning, the same events and the same order, and keep every name. Use short sentences and everyday words, and replace old-fashioned or difficult words and long, winding sentences with plain ones. Keep dialogue as dialogue and keep who is speaking. Do not add explanations, opinions or new details, and do not leave anything out that matters to the story. The result should be about as long as the original, or a little longer if that makes it clearer. Give only the rewritten text, with no introduction and no quotation marks around it."},
   analysis:{max:900,task:"Write a short literary analysis of the selected text.",sys:"Give a short, easy-to-follow literary analysis of the selected passage, for a student who is new to analysing books. Say what the author is doing and how (for example the mood, a hidden meaning, a comparison, humour or irony, or what we learn about a character), and why it matters for the story. Point to specific words from the text. Explain any literary term in plain words the first time you use it. About 120 words at most."}
 };
 function friendly(err){
@@ -1719,7 +1720,7 @@ function renderNotes(){
     li.append(go,d);ul.append(li);
   });
 }
-const MODE_NAME={define:"Define",explain:"Explain",analysis:"Analysis"};
+const MODE_NAME={define:"Define",explain:"Explain",simplify:"Simplify",analysis:"Analysis"};
 function keyNote(){$("keyNote").textContent=getKey()?"A key is saved in this browser.":"No key saved yet."}
 $("sKeySave").onclick=()=>{if(saveKey($("sKey").value))$("sKey").value=""};
 $("sKeyClear").onclick=()=>{store.set("marginalia.apikey","");$("sKey").value="";keyNote()};
