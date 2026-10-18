@@ -123,6 +123,11 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .lib{padding-block:28px 64px;display:grid;gap:30px}
 .lib h1{font-family:var(--font-display);font-size:clamp(1.9rem,5vw,2.8rem);line-height:1.1;margin:0;text-wrap:balance;max-width:20ch}
 .lib p.lede{max-width:60ch;color:var(--muted);line-height:1.55;margin:8px 0 0}
+.relay{margin-top:10px;font-size:.9rem}
+.relay summary{cursor:pointer;color:var(--muted)}
+.relay .find{margin:6px 0}
+.relay input{flex:1;min-width:12rem}
+#srcLink{display:inline-block;margin:10px 0 2px;color:var(--accent)}
 .find{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .find input[type=text]{flex:1 1 16rem;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:11px 14px;font-size:1rem}
 .sec{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 12px;font-weight:600}
@@ -225,10 +230,15 @@ html.reading{overflow:hidden}
   </div>
   <div>
     <form class="find" id="findForm">
-      <input type="text" id="q" placeholder="Search title or author, or type an ID like 1342" aria-label="Search the library or enter a Gutenberg ID" autocomplete="off">
+      <input type="text" id="q" placeholder="Search title or author, an ID like 1342, or paste a web link" aria-label="Search the library, enter a Gutenberg ID or paste a web link" autocomplete="off">
       <button class="btn primary" type="submit">Open</button>
     </form>
     <p class="msg" id="msg" role="status"></p>
+    <details class="relay" id="relayBox"><summary>Web links: relay address</summary>
+      <p class="small">To read a web page, Marginalia asks your own relay to fetch it (see README, "Reading web links"). Paste the address of your relay here.</p>
+      <div class="find"><input type="url" id="relayUrl" placeholder="https://marginalia-relay.yourname.workers.dev" aria-label="Relay address" autocomplete="off" spellcheck="false"><button class="btn" id="relaySave" type="button">Save and test</button></div>
+      <p class="small" id="relayNote" role="status"></p>
+    </details>
   </div>
   <div id="contWrap" hidden>
     <h2 class="sec">Continue reading</h2>
@@ -267,7 +277,7 @@ html.reading{overflow:hidden}
 </main>
 
 <div class="scrim" id="scrim" hidden></div>
-<nav class="drawer" id="drawer" hidden aria-label="Contents"><h3>Contents</h3><ul class="toc" id="toc"></ul><h3 id="wlH" style="margin-top:18px" hidden>Wordlist</h3><button class="btn" id="wlCopy" type="button" hidden>Copy list</button><ul class="notes" id="wls"></ul><h3 id="bmH" style="margin-top:18px" hidden>Bookmarks</h3><ul class="notes" id="bms"></ul><h3 id="notesH" style="margin-top:18px" hidden>Margin notes</h3><ul class="notes" id="notes"></ul></nav>
+<nav class="drawer" id="drawer" hidden aria-label="Contents"><h3>Contents</h3><a id="srcLink" target="_blank" rel="noopener noreferrer" hidden>Open the original page ↗</a><ul class="toc" id="toc"></ul><h3 id="wlH" style="margin-top:18px" hidden>Wordlist</h3><button class="btn" id="wlCopy" type="button" hidden>Copy list</button><ul class="notes" id="wls"></ul><h3 id="bmH" style="margin-top:18px" hidden>Bookmarks</h3><ul class="notes" id="bms"></ul><h3 id="notesH" style="margin-top:18px" hidden>Margin notes</h3><ul class="notes" id="notes"></ul></nav>
 <aside class="sheet" id="sheet" hidden aria-label="Reading settings">
   <h3>Reading</h3>
   <div class="ctl"><label>Text size</label><div class="seg" id="sSize"><button data-v="-1" type="button">A&minus;</button><button data-v="1" type="button">A+</button></div></div>
@@ -317,6 +327,7 @@ html.reading{overflow:hidden}
 <div class="toast" id="toast" role="status" hidden></div>
 <div class="bub above" id="bub" role="dialog" aria-label="Explanation" hidden><span class="tail"></span><div class="bq" id="bq"></div><div class="bmodes" id="bModes"><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="simplify">Simplify</button><button type="button" data-m="analysis">Literary analysis</button></div><div class="ba" id="ba"></div><div class="keyrow" id="bKeyRow" hidden><input id="bKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-&hellip;"><button id="bKeySave" type="button">Save</button></div><div class="bf" id="bf"><button id="bBm" type="button" hidden>Remove bookmark</button><button id="bPin" type="button">Pin to margin</button><button id="bCopy" type="button">Copy</button><button id="bX" type="button" aria-label="Close">Close</button></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mozilla/readability@0.5.0/Readability.js"></script>
 <script>
 (function(){
 const $=id=>document.getElementById(id);
@@ -372,13 +383,19 @@ function parseText(raw,name){
   }
   return finish(ch,meta,name);
 }
-function htmlToChapters(doc){
+function htmlToChapters(doc,opt){
+  opt=opt||{};
   const out=[];let cur={title:"",paras:[]};
   const body=doc.body||doc;
   body.querySelectorAll("script,style,nav").forEach(n=>n.remove());
   const push=()=>{if(cur.paras.length)out.push(cur)};
-  body.querySelectorAll("h1,h2,h3,p,pre,hr,blockquote").forEach(n=>{
+  body.querySelectorAll(opt.web?"h1,h2,h3,h4,h5,h6,p,pre,hr,blockquote,li,tr":"h1,h2,h3,p,pre,hr,blockquote").forEach(n=>{
     const tag=n.tagName,t=(n.textContent||"").replace(/\s+/g," ").trim();
+    if(opt.web){
+      if(tag==="LI"){if(t&&!n.querySelector("p,blockquote,li"))cur.paras.push("\u2022 "+t);return}
+      if(tag==="TR"){if(t&&!n.closest("li")){const cells=[...n.children].map(c=>(c.textContent||"").replace(/\s+/g," ").trim()).filter(Boolean);if(cells.length)cur.paras.push(cells.join(" \u00B7 "))}return}
+      if(/^H[456]$/.test(tag)){if(t)cur.paras.push(t);return}
+    }
     if(/^H[123]$/.test(tag)){if(!t)return;if(cur.paras.length){push();cur={title:t,paras:[]}}else cur.title=cur.title?cur.title+" — "+t:t}
     else if(tag==="HR"){cur.paras.push({hr:1})}
     else if(tag==="PRE"){if(t)cur.paras.push({v:n.textContent.replace(/\s+$/,"")})}
@@ -454,6 +471,81 @@ async function importFile(f){
   await putBook(b);return b;
 }
 
+/* ---------- web links: fetched through your own relay (see relay-worker.js) ---------- */
+function asUrl(v){
+  v=(v||"").trim();if(!v||/\s/.test(v))return null;
+  if(/^https?:\/\/\S+\.\S+/i.test(v))return v;
+  if(/^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/\S*)?$/i.test(v))return "https://"+v;
+  return null;
+}
+const relayAddr=()=>(store.get("marginalia.relay","")||"").trim().replace(/[?#].*$/,"").replace(/\/+$/,"");
+async function relayFetch(u,ms){
+  const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),ms||25000);
+  try{return await fetch(relayAddr()+"/?url="+encodeURIComponent(u),{signal:ctl.signal})}
+  finally{clearTimeout(t)}
+}
+function extractArticle(html,url){
+  const doc=new DOMParser().parseFromString(html,"text/html");
+  const pageTitle=((doc.querySelector("title")||{}).textContent||"").replace(/\s+/g," ").trim();
+  let title=pageTitle,author="",host="";try{host=new URL(url).hostname.replace(/^www\./,"")}catch(e){}
+  let ch=null;
+  if(window.Readability){
+    try{
+      const art=new Readability(doc.cloneNode(true),{charThreshold:200}).parse();
+      if(art&&art.content){
+        title=(art.title||pageTitle).trim();author=(art.byline||art.siteName||"").replace(/\s+/g," ").trim();
+        ch=htmlToChapters(new DOMParser().parseFromString("<body>"+art.content+"</body>","text/html"),{web:true});
+      }
+    }catch(e){ch=null}
+  }
+  if(!ch||!ch.length||ch.reduce((n,c)=>n+c.paras.length,0)<2){          // Readability missing or found nothing: use the main part of the page
+    doc.querySelectorAll("script,style,nav,header,footer,aside,form,noscript,iframe").forEach(n=>n.remove());
+    const main=doc.querySelector("article")||doc.querySelector("main,[role=main]")||doc.body;
+    ch=main?htmlToChapters(main,{web:true}):[];
+  }
+  ch=ch.filter(c=>c.paras.length);
+  if(ch.length>1&&words(ch[0].paras.join(" "))<40){const f=ch.shift();ch[0]={title:ch[0].title,paras:f.paras.concat(ch[0].paras)}}   // a byline or standfirst on its own is not a chapter
+  {const h1=((doc.querySelector("h1")||{}).textContent||"").replace(/\s+/g," ").trim(),segs=title.split(/\s[|\u2013\u2014-]\s/);
+   if(h1&&title.includes(h1))title=h1;else if(segs.length>1&&segs[0].length>8)title=segs[0].trim()}
+  if(!ch.length)throw new Error("I could not find readable text on that page. It may need a login, be behind a paywall, or build its text with JavaScript.");
+  ch.forEach((c,i)=>{if(!c.title)c.title=ch.length===1?title||host||"Article":"Part "+(i+1)});
+  return {ch,meta:{title:title||host,author:author||host}};
+}
+async function openUrl(url){
+  if(!relayAddr()){
+    $("relayBox").open=true;msg("To open web links, first paste your relay address below (see README, “Reading web links”).",true);$("relayUrl").focus();return;
+  }
+  const have=(await allBooks()).find(b=>b.source===url);
+  if(have){msg("");openBook(have);return}
+  msg("Fetching the page…");
+  let res;
+  try{res=await relayFetch(url)}
+  catch(e){msg(e.name==="AbortError"?"The relay took too long to answer.":"Could not reach your relay. Check its address below.",true);return}
+  if(!res.ok){
+    let m="";try{m=(await res.json()).error||""}catch(e){}
+    msg(m||("The relay answered with an error ("+res.status+")."),true);return;
+  }
+  try{
+    const final=res.headers.get("x-final-url")||url,html=await res.text();
+    const {ch,meta}=extractArticle(html,final);
+    const b=finish(ch,meta,meta.title||"Web page");
+    if(b.total<80)throw new Error("I could not find enough readable text on that page.");
+    b.source=final;b.web=true;
+    await putBook(b);msg("");openBook(b);
+  }catch(e){msg(e.message||"Could not read that page.",true)}
+}
+$("relayUrl").value=relayAddr();
+$("relayUrl").addEventListener("keydown",e=>e.stopPropagation());
+$("relaySave").onclick=async()=>{
+  const v=$("relayUrl").value.trim().replace(/[?#].*$/,"").replace(/\/+$/,""),n=$("relayNote");
+  if(!/^https:\/\/\S+$/i.test(v)){n.textContent="Paste the full https address of the relay.";return}
+  store.set("marginalia.relay",v);$("relayUrl").value=v;n.textContent="Testing…";
+  try{
+    const r=await fetch(v+"/",{});const j=await r.json().catch(()=>({}));
+    n.textContent=r.ok&&j.service==="marginalia-relay"?"Saved. The relay works.":(j.error||"Saved, but this address did not answer like a Marginalia relay.");
+  }catch(e){n.textContent="Saved, but the relay could not be reached from here. Check the address, and that your site's address is in ALLOWED_ORIGINS."}
+};
+
 /* ---------- library view ---------- */
 const msg=(t,err)=>{const m=$("msg");m.textContent=t;m.className="msg"+(err?" err":"")};
 let CAT=[];
@@ -507,9 +599,10 @@ async function openById(id,el){
   }catch(e){msg("Could not open that book ("+(e.message||e)+"). Try again.",true)}
   finally{if(el)el.classList.remove("loading")}
 }
-$("q").addEventListener("input",()=>{msg("");renderCat()});
+$("q").addEventListener("input",()=>{msg("");renderCat();if(asUrl($("q").value)){const p=$("cat").querySelector("p.small");if(p)p.textContent="That looks like a web link. Press Open to read it."}});
 $("findForm").addEventListener("submit",e=>{
   e.preventDefault();const v=$("q").value.trim();
+  {const u=asUrl(v);if(u){openUrl(u);return}}
   if(/^#?\d+$/.test(v)){openById(v.replace("#",""));return}
   const hits=CAT.filter(b=>(b.title+" "+b.author).toLowerCase().includes(v.toLowerCase()));
   if(hits.length===1)openById(hits[0].id);else if(!v)msg("Type a title, an author or a Gutenberg ID.",true);else if(!hits.length)msg("Nothing matches “"+v+"”.",true)
@@ -533,6 +626,7 @@ function openBook(b){
   $("lib").hidden=true;$("reader").hidden=false;document.documentElement.classList.add("reading");
   $("tline").hidden=false;$("tocBtn").hidden=false;$("listenBtn").hidden=false;$("lineBtn").hidden=false;$("bmBtn").hidden=false;fixIdTitle(b);lfSet(!!prefs.lineFocus,true);
   $("tline").textContent=b.title+(b.author?" — "+b.author:"");
+  {const sl=$("srcLink");let ok=false;try{ok=!!b.source&&/^https?:$/.test(new URL(b.source).protocol)}catch(e){}sl.hidden=!ok;if(ok)sl.href=b.source}
   b.notes=b.notes||[];b.marks=b.marks||[];b.words=(b.words||[]).filter(x=>x.def);buildToc();renderNotes();renderBookmarks();renderWordlist();scrollTo(0,0);showChapter(b.pos.c,b.pos.f);
 }
 function buildToc(){
