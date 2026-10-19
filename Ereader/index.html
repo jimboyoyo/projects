@@ -572,11 +572,11 @@ function renderCat(){
   if(!list.length){const p=document.createElement("p");p.className="small";p.style.color="var(--muted)";p.textContent="No match in the library. If you typed a Gutenberg ID, press Open to try it.";box.append(p)}
 }
 async function renderShelf(){
-  const bs=(await allBooks()).filter(b=>readFrac(b)>0.002||b.guide).sort((a,b)=>(b.opened||0)-(a.opened||0));
+  const bs=(await allBooks()).filter(b=>readFrac(b)>0.002||b.guide||b.web||b.gid==null||(b.notes&&b.notes.length)||(b.marks&&b.marks.length)||(b.words&&b.words.length)).sort((a,b)=>(b.opened||0)-(a.opened||0));
   $("contWrap").hidden=!bs.length;const sh=$("shelf");sh.textContent="";
   bs.forEach(b=>{
     const wrap=document.createElement("div");wrap.style.cssText="position:relative;min-width:0";
-    wrap.append(card(b.title,b.author,Math.round(readFrac(b)*100)+"% read · "+fmtH(b.total*(1-readFrac(b)))+" left",readFrac(b),()=>openBook(b)));
+    wrap.append(card(b.title,b.author,(readFrac(b)>0.002?Math.round(readFrac(b)*100)+"% read · "+fmtH(b.total*(1-readFrac(b)))+" left":(b.web?"Web page · ":"")+fmtH(b.total)+" to read"),readFrac(b),()=>openBook(b)));
     const x=document.createElement("button");x.type="button";x.textContent="Remove";x.setAttribute("aria-label","Remove "+b.title);
     x.style.cssText="position:absolute;top:8px;right:8px;background:none;border:0;color:var(--muted);padding:4px 8px;border-radius:4px;font-size:.8rem";
     x.onclick=async()=>{if(x.dataset.sure){await delBook(b.id);renderShelf()}else{x.dataset.sure=1;x.textContent="Remove?";setTimeout(()=>{x.dataset.sure="";x.textContent="Remove"},2500)}};
