@@ -42,6 +42,31 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 #fnBand .fnp b{color:var(--fg);font-weight:600}
 #fnBand .fnp sup{color:var(--accent);font-weight:600;margin-right:.3em;font-size:.85em}
 #wlCopy{margin:2px 0 6px}
+#printBtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vertical-align:-3px}
+.prbody{display:grid;gap:10px;padding:14px;font-family:var(--font-ui);font-size:.92rem}
+.prbody label{display:flex;gap:8px;align-items:baseline}
+.prbody label span{color:var(--muted);font-size:.82rem}
+.prbody .go{justify-self:start}
+#printArea{display:none}
+.psheet{--bg:#fff;--fg:#14171a;--surface:#fff;--muted:#555;--line:#b9bdb9;--accent:#14513f;--accent-fg:#fff;--hl:rgba(20,81,63,.14);position:absolute;left:0;top:0;transform-origin:0 0;background:#fff;color:var(--fg);overflow:hidden}
+.psheet *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.psheet .pleaf{position:absolute;top:0;bottom:0;border:1px solid var(--line)}
+.psheet .pn{position:absolute;left:0;right:0;bottom:13px;text-align:center;font-family:var(--font-ui);font-size:.78rem;color:var(--muted)}
+.psheet .phead{position:absolute;left:0;right:0;font-family:var(--font-ui);font-size:.72rem;letter-spacing:.03em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.psheet .pwin{position:absolute;overflow:hidden}
+.psheet .pfn{position:absolute;pointer-events:none}
+.psheet .pfn .fnp{position:absolute;top:0;bottom:0;border-top:1px solid var(--line);padding-top:.35em;font-family:var(--font-ui);color:var(--muted);line-height:1.3;overflow:hidden}
+.psheet .pfn .fnp div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.psheet .pfn .fnp b{color:var(--fg);font-weight:600}
+.psheet .pfn .fnp sup{color:var(--accent);font-weight:600;margin-right:.3em;font-size:.85em}
+.pwrap{position:relative;margin:0 auto;overflow:hidden;break-inside:avoid;page-break-inside:avoid}
+@media print{
+  html,body{background:#fff!important;height:auto!important;overflow:visible!important}
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block}
+  .pwrap{break-after:page;page-break-after:always}
+  .pwrap:last-child{break-after:auto;page-break-after:auto}
+}
 .lb{position:fixed;inset:0;z-index:50;background:rgba(10,14,18,.62);display:flex;align-items:center;justify-content:center;padding:16px}
 .lb[hidden]{display:none}
 .lbc{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;width:min(860px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.4);font-family:var(--font-ui)}
@@ -114,6 +139,8 @@ button{cursor:pointer}
 .wrap.wide{max-width:none}
 .lib.wrap{width:100%}
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:10px 0;flex-wrap:wrap}
+@media (max-width:520px){header.top{gap:6px 6px}header.top .btn{padding:6px 9px;font-size:.85rem}header.top .brand{font-size:1.1rem}}
+@media (max-width:380px){#tline{display:none}}
 .brand{font-family:var(--font-display);font-weight:700;font-size:1.25rem;letter-spacing:-.01em;margin-right:auto;background:none;border:0;padding:0}
 .btn{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 12px;font-weight:500}
 .btn:hover{border-color:var(--accent)}
@@ -216,6 +243,7 @@ html.reading{overflow:hidden}
   <button class="brand" id="home" type="button">Marginalia</button>
   <span class="title-line" id="tline" hidden></span>
   <button class="btn" id="bmBtn" type="button" aria-pressed="false" aria-label="Bookmark this page" title="Bookmark this page (B)" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+  <button class="btn" id="printBtn" type="button" aria-label="Print" title="Print (Ctrl+P)" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/></svg></button>
   <button class="btn" id="lineBtn" type="button" aria-pressed="false" title="Line focus: highlight the line you are reading" hidden>Line focus</button>
   <button class="btn" id="listenBtn" type="button" aria-pressed="false" hidden>Listen</button>
   <button class="btn" id="tocBtn" type="button" hidden>Contents</button>
@@ -315,6 +343,15 @@ html.reading{overflow:hidden}
 </aside>
 
 <div class="pill" id="askPill" role="toolbar" aria-label="Selected text" hidden><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="simplify" title="Rewrite this in simpler words">Simplify</button><button type="button" data-m="analysis">Analyse</button><button type="button" data-m="images" title="Look up pictures of this" hidden>Images</button><span class="sep"></span><button type="button" data-m="bookmark" title="Bookmark this passage">Bookmark</button><button type="button" data-m="word" title="Add this word to the wordlist with a footnote" hidden>Add to wordlist</button></div>
+<div class="lb" id="prBox" hidden role="dialog" aria-modal="true" aria-label="Print"><div class="lbc" style="width:min(430px,100%)">
+  <div class="lbh"><strong style="flex:1">Print</strong><button class="btn" id="prX" type="button" aria-label="Close">×</button></div>
+  <div class="prbody">
+    <label><input type="radio" name="prMode" value="page" checked> This page <span id="prPg"></span></label>
+    <label><input type="radio" name="prMode" value="chapter"> This chapter <span id="prCh"></span></label>
+    <p class="small" style="margin:0;color:var(--muted)">Prints in the current layout, with footnotes, pins and bookmarks, on A4. In the print window, turn on “Background graphics” to keep the highlights.</p>
+    <button class="btn primary go" id="prGo" type="button">Print</button>
+  </div>
+</div></div>
 <div class="lb" id="imgBox" hidden role="dialog" aria-modal="true" aria-label="Pictures"><div class="lbc">
   <div class="lbh"><form id="imgForm"><input id="imgQ" type="search" aria-label="Search term" autocomplete="off"><button class="btn" type="submit">Search</button></form><button class="btn" id="imgX" type="button" aria-label="Close">×</button></div>
   <div class="lbt" id="imgTabs" role="tablist" aria-label="Picture source"></div>
@@ -624,7 +661,7 @@ const flow=$("flow"),view=$("view"),stage=$("stage");
 function openBook(b){
   book=b;b.opened=Date.now();putBook(b);
   $("lib").hidden=true;$("reader").hidden=false;document.documentElement.classList.add("reading");
-  $("tline").hidden=false;$("tocBtn").hidden=false;$("listenBtn").hidden=false;$("lineBtn").hidden=false;$("bmBtn").hidden=false;fixIdTitle(b);lfSet(!!prefs.lineFocus,true);
+  $("tline").hidden=false;$("tocBtn").hidden=false;$("listenBtn").hidden=false;$("lineBtn").hidden=false;$("bmBtn").hidden=false;$("printBtn").hidden=false;fixIdTitle(b);lfSet(!!prefs.lineFocus,true);
   $("tline").textContent=b.title+(b.author?" — "+b.author:"");
   {const sl=$("srcLink");let ok=false;try{ok=!!b.source&&/^https?:$/.test(new URL(b.source).protocol)}catch(e){}sl.hidden=!ok;if(ok)sl.href=b.source}
   b.notes=b.notes||[];b.marks=b.marks||[];b.words=(b.words||[]).filter(x=>x.def);buildToc();renderNotes();renderBookmarks();renderWordlist();scrollTo(0,0);showChapter(b.pos.c,b.pos.f);
@@ -700,7 +737,7 @@ function fillChapter(){
   document.querySelectorAll("#toc button").forEach((b,j)=>b.setAttribute("aria-current",j===book.pos.c));
   markNotes();LF.lines=null;LF.cur=-1;LF.hover=-1;
 }
-let LP=1,LC=1,leaves=1;
+let LP=1,LC=1,leaves=1,GEO=null;
 function layout(){
   lfInvalidate();
   // size the stage to the space left under the header and above the footer
@@ -724,7 +761,7 @@ function layout(){
   pageW=N*colW+(N-1)*G;
   const book2=P===2,paperW=book2?pageW+G:pageW,vTop=book2?26:18,vBot=book2?44:18,fnH=(book&&book.words&&book.words.length)?Math.round(size*4.2):0;
   const paper=$("paper");paper.style.width=paperW+"px";paper.style.height=H+"px";paper.classList.toggle("book",book2);
-  view.style.left=(book2?Math.round(G/2):0)+"px";view.style.top=vTop+"px";view.style.width=pageW+"px";view.style.height=(H-vTop-vBot-fnH)+"px";{const fb=$("fnBand");fb.style.left=view.style.left;fb.style.top=(vTop+H-vTop-vBot-fnH)+"px";fb.style.width=pageW+"px";fb.style.height=Math.max(0,fnH-4)+"px";fb.style.fontSize=(size*0.68)+"px"}
+  view.style.left=(book2?Math.round(G/2):0)+"px";view.style.top=vTop+"px";view.style.width=pageW+"px";view.style.height=(H-vTop-vBot-fnH)+"px";GEO={paperW,H,vTop,viewH:H-vTop-vBot-fnH,fnH,left:book2?Math.round(G/2):0,size};{const fb=$("fnBand");fb.style.left=view.style.left;fb.style.top=(vTop+H-vTop-vBot-fnH)+"px";fb.style.width=pageW+"px";fb.style.height=Math.max(0,fnH-4)+"px";fb.style.fontSize=(size*0.68)+"px"}
   flow.style.width=pageW+"px";flow.style.columnCount=N;flow.style.columnGap=G+"px";
   // count the columns that hold text, from where the last element ends
   const fr=flow.getBoundingClientRect(),last=flow.lastElementChild;let tc=1;
@@ -781,7 +818,7 @@ stage.addEventListener("touchend",e=>{if(tx0==null)return;const dx=e.changedTouc
 // after a mouse or touch click, hand the keyboard back to the page so Space and the arrow keys control reading
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("button");if(b&&e.detail>0)b.blur()});
 addEventListener("keydown",e=>{
-  if(!$("imgBox").hidden)return;
+  if(!$("imgBox").hidden||!$("prBox").hidden)return;
   const tag=(e.target||{}).tagName||"";
   if($("reader").hidden||/INPUT|SELECT|TEXTAREA/.test(tag)||e.metaKey||e.ctrlKey||e.altKey)return;
   if(e.key===" "&&tag==="BUTTON")return;                 // space on a focused button presses it
@@ -814,7 +851,7 @@ function relayout(){
 }
 let rt=null;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(relayout,150)});
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>setTimeout(relayout,50));
-$("home").onclick=async()=>{if(book)await putBook(book);bubClose();lfSet(false,true,true);$("lineBtn").hidden=true;$("bmBtn").hidden=true;$("ribbon").hidden=true;$("fnBand").hidden=true;book=null;voiceStop("");wordsClear();V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
+$("home").onclick=async()=>{if(book)await putBook(book);bubClose();lfSet(false,true,true);$("lineBtn").hidden=true;$("bmBtn").hidden=true;$("printBtn").hidden=true;$("ribbon").hidden=true;$("fnBand").hidden=true;book=null;voiceStop("");wordsClear();V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
 
 const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,wordHl:true,gpu:false,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,lfExt:0,claudeLang:"auto",claudeLangOther:"",v:2},store.get("marginalia.prefs",{}));
 if((prefs.v||0)<2){prefs.gpu=false;prefs.v=2}   // GPU was on by default before; it is slow to start and unreliable for this model, so CPU is now the default
@@ -1730,6 +1767,56 @@ $("imgQ").addEventListener("input",imgGoogle);$("imgT").addEventListener("change
 $("imgX").onclick=imgClose;$("imgBack").onclick=imgBack;
 $("imgBox").addEventListener("mousedown",e=>{if(e.target===$("imgBox"))imgClose()});
 $("imgBox").addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();if(!$("imgBig").hidden)imgBack();else imgClose()}});
+/* ---------- printing: the current layout, page by page, with footnotes ---------- */
+const PR={built:false};
+function teardownPrint(){const a=document.getElementById("printArea");if(a)a.remove();const st=document.getElementById("printPage");if(st)st.remove();PR.built=false}
+function buildPrint(mode){
+  teardownPrint();
+  if(!book||!pageW||!GEO)return false;
+  const {paperW:W,H,vTop,viewH,fnH,left,size}=GEO,land=W>H,mm=96/25.4;
+  const availW=(land?297:210)*mm-20*mm,availH=(land?210:297)*mm-20*mm;
+  const sc=Math.min(availW/W,availH/H,1.25)*0.985;
+  const st=document.createElement("style");st.id="printPage";st.textContent="@page{size:A4 "+(land?"landscape":"portrait")+";margin:10mm}";document.head.append(st);
+  const area=document.createElement("div");area.id="printArea";
+  const from=mode==="chapter"?0:page,to=mode==="chapter"?pages-1:page,ch=book.chapters[book.pos.c];
+  for(let p=from;p<=to;p++){
+    const wrap=document.createElement("div");wrap.className="pwrap";wrap.style.width=(W*sc)+"px";wrap.style.height=(H*sc)+"px";
+    const sheet=document.createElement("div");sheet.className="psheet";sheet.style.width=W+"px";sheet.style.height=H+"px";sheet.style.transform="scale("+sc+")";
+    for(let k=0;k<LP;k++){
+      const lf=document.createElement("div");lf.className="pleaf";lf.style.left=(k*W/LP)+"px";lf.style.width=(W/LP)+"px";if(LP===1)lf.style.border="0";
+      const n=p*LP+k+1;if(n<=leaves){const pn=document.createElement("span");pn.className="pn";pn.textContent=n;lf.append(pn)}
+      sheet.append(lf);
+    }
+    const head=document.createElement("div");head.className="phead";head.style.top=Math.max(2,vTop-17)+"px";head.style.left=left+"px";head.style.width=pageW+"px";
+    head.textContent=book.title+(book.author?" \u2014 "+book.author:"")+"  \u00B7  "+(ch?ch.title:"");sheet.append(head);
+    const win=document.createElement("div");win.className="pwin";win.style.cssText="left:"+left+"px;top:"+vTop+"px;width:"+pageW+"px;height:"+viewH+"px";
+    const c=flow.cloneNode(true);c.classList.remove("vmode");c.style.transition="none";c.style.transform="translateX("+(-p*(pageW+gap))+"px)";
+    c.querySelectorAll(".hl,.wh").forEach(e=>e.classList.remove("hl","wh"));
+    win.append(c);sheet.append(win);
+    if(fnH){const fb=document.createElement("div");fb.className="pfn";fb.style.cssText="left:"+left+"px;top:"+(vTop+viewH)+"px;width:"+pageW+"px;height:"+Math.max(0,fnH-4)+"px;font-size:"+(size*0.68)+"px";fnFill(fb,fnLists(p));sheet.append(fb)}
+    wrap.append(sheet);area.append(wrap);
+  }
+  document.body.append(area);PR.built=true;return true;
+}
+function openPrint(){
+  if(!book||$("reader").hidden)return;
+  const la=page*LP+1,lb=Math.min(la+LP-1,leaves);
+  $("prPg").textContent="("+(la>=lb?"page "+la:"pages "+la+"\u2013"+lb)+")";
+  $("prCh").textContent="("+pages+(pages===1?" sheet":" sheets")+")";
+  $("prBox").hidden=false;$("prGo").focus();
+}
+function closePrint(){$("prBox").hidden=true}
+function doPrint(){
+  const mode=(document.querySelector('input[name=prMode]:checked')||{}).value||"page";
+  closePrint();bubClose(false);
+  if(buildPrint(mode))setTimeout(()=>{try{window.print()}catch(e){}},60);
+}
+$("printBtn").onclick=openPrint;$("prGo").onclick=doPrint;$("prX").onclick=closePrint;
+$("prBox").addEventListener("mousedown",e=>{if(e.target===$("prBox"))closePrint()});
+$("prBox").addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();closePrint()}});
+addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&!e.altKey&&(e.key==="p"||e.key==="P")&&book&&!$("reader").hidden){e.preventDefault();if($("prBox").hidden)openPrint()}});
+addEventListener("beforeprint",()=>{if(!PR.built&&book&&!$("reader").hidden)buildPrint("page")});
+addEventListener("afterprint",()=>teardownPrint());
 function wlTipHide(){$("wlTip").hidden=true}
 function wlTipShow(m){
   const w=wordsOf().find(x=>x.id===Number(m.dataset.id));if(!w||!w.def||!bub.hidden)return;
@@ -1748,17 +1835,17 @@ function removeWord(w){
   if(!wordsOf().length)relayout();
   refreshMarks();renderWordlist();
 }
-function fnRender(){
-  const band=$("fnBand");
-  if(!book||!wordsOf().length||!pageW){band.hidden=true;return}
-  band.hidden=false;band.textContent="";
+function fnLists(p){
   const N=LP*LC,step=(pageW-(N-1)*gap)/N+gap,fr=flow.getBoundingClientRect(),per=Array.from({length:LP},()=>[]);
   flow.querySelectorAll("mark.wl[data-n]").forEach(m=>{
     const r=m.getClientRects()[0];if(!r)return;
-    const col=Math.floor((r.left-fr.left+4)/step);if(Math.floor(col/N)!==page)return;
+    const col=Math.floor((r.left-fr.left+4)/step);if(Math.floor(col/N)!==p)return;
     const w=wordsOf().find(x=>x.id===Number(m.dataset.id));
     if(w)per[Math.min(LP-1,Math.floor((col%N)/LC))].push({n:Number(m.dataset.n),w});
   });
+  return per;
+}
+function fnFill(band,per){
   const lw=(pageW-(LP-1)*gap)/LP;
   per.forEach((list,k)=>{
     if(!list.length)return;
@@ -1771,6 +1858,11 @@ function fnRender(){
     if(list.length>3){const m=document.createElement("div");m.textContent="+ "+(list.length-3)+" more in Contents";d.append(m)}
     band.append(d);
   });
+}
+function fnRender(){
+  const band=$("fnBand");
+  if(!book||!wordsOf().length||!pageW){band.hidden=true;return}
+  band.hidden=false;band.textContent="";fnFill(band,fnLists(page));
 }
 function renderWordlist(){
   const ul=$("wls");ul.textContent="";const all=wordsOf().filter(x=>x.def),seen=new Set(),first=all.slice().sort((a,b)=>a.c-b.c||a.a0.s0-b.a0.s0);
