@@ -93,6 +93,9 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 .lbf label{display:flex;gap:5px;align-items:center}
 #wlTip{position:fixed;z-index:35;max-width:min(300px,86vw);background:var(--fg);color:var(--bg);padding:6px 11px;border-radius:8px;font-family:var(--font-ui);font-size:.85rem;line-height:1.35;box-shadow:0 4px 16px rgba(0,0,0,.3);pointer-events:none}
 #wlTip b{font-weight:600}
+.askrow{display:flex;gap:6px;margin:8px 0 2px}
+.askrow input{flex:1;min-width:0;font:inherit;font-size:.9rem;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.askrow button{background:var(--accent);color:var(--accent-fg);border:0;border-radius:8px;padding:6px 12px;font:inherit;font-size:.88rem;cursor:pointer}
 .bmodes{display:flex;gap:4px;margin:0 0 7px;flex-wrap:wrap}
 .bmodes button{background:none;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 10px;font-size:.75rem;cursor:pointer}
 .bmodes button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
@@ -342,7 +345,7 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Theme</label><div class="seg" id="sTheme"><button data-v="auto" type="button">Auto</button><button data-v="light" type="button">Light</button><button data-v="dark" type="button">Dark</button></div></div>
 </aside>
 
-<div class="pill" id="askPill" role="toolbar" aria-label="Selected text" hidden><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="simplify" title="Rewrite this in simpler words">Simplify</button><button type="button" data-m="analysis">Analyse</button><button type="button" data-m="images" title="Look up pictures of this" hidden>Images</button><span class="sep"></span><button type="button" data-m="bookmark" title="Bookmark this passage">Bookmark</button><button type="button" data-m="word" title="Add this word to the wordlist with a footnote" hidden>Add to wordlist</button></div>
+<div class="pill" id="askPill" role="toolbar" aria-label="Selected text" hidden><button type="button" data-m="ask" title="Ask your own question about this">Ask</button><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="simplify" title="Rewrite this in simpler words">Simplify</button><button type="button" data-m="analysis">Analyse</button><button type="button" data-m="images" title="Look up pictures of this" hidden>Images</button><span class="sep"></span><button type="button" data-m="bookmark" title="Bookmark this passage">Bookmark</button><button type="button" data-m="word" title="Add this word to the wordlist with a footnote" hidden>Add to wordlist</button></div>
 <div class="lb" id="prBox" hidden role="dialog" aria-modal="true" aria-label="Print"><div class="lbc" style="width:min(430px,100%)">
   <div class="lbh"><strong style="flex:1">Print</strong><button class="btn" id="prX" type="button" aria-label="Close">×</button></div>
   <div class="prbody">
@@ -362,7 +365,7 @@ html.reading{overflow:hidden}
 </div></div>
 <div id="wlTip" role="tooltip" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
-<div class="bub above" id="bub" role="dialog" aria-label="Explanation" hidden><span class="tail"></span><div class="bq" id="bq"></div><div class="bmodes" id="bModes"><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="simplify">Simplify</button><button type="button" data-m="analysis">Literary analysis</button></div><div class="ba" id="ba"></div><div class="keyrow" id="bKeyRow" hidden><input id="bKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-&hellip;"><button id="bKeySave" type="button">Save</button></div><div class="bf" id="bf"><button id="bBm" type="button" hidden>Remove bookmark</button><button id="bPin" type="button">Pin to margin</button><button id="bCopy" type="button">Copy</button><button id="bX" type="button" aria-label="Close">Close</button></div></div>
+<div class="bub above" id="bub" role="dialog" aria-label="Explanation" hidden><span class="tail"></span><div class="bq" id="bq"></div><div class="bmodes" id="bModes"><button type="button" data-m="ask">Ask</button><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="simplify">Simplify</button><button type="button" data-m="analysis">Literary analysis</button></div><div class="ba" id="ba"></div><div class="askrow" id="bAskRow" hidden><input id="bAskQ" type="text" maxlength="300" autocomplete="off" placeholder="Type your question…" aria-label="Your question about the selected text"><button id="bAskGo" type="button">Ask</button></div><div class="keyrow" id="bKeyRow" hidden><input id="bKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-&hellip;"><button id="bKeySave" type="button">Save</button></div><div class="bf" id="bf"><button id="bBm" type="button" hidden>Remove bookmark</button><button id="bPin" type="button">Pin to margin</button><button id="bCopy" type="button">Copy</button><button id="bX" type="button" aria-label="Close">Close</button></div></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mozilla/readability@0.5.0/Readability.js"></script>
 <script>
@@ -1344,6 +1347,7 @@ function setBub(o){
   $("bq").textContent="“"+o.q+"”";
   const a=$("ba");a.textContent=o.a||"";a.className="ba"+(o.cls?" "+o.cls:"");
   $("bKeyRow").hidden=!o.needKey;
+  $("bAskRow").hidden=!(LK.cur&&LK.cur.mode==="ask")||!!o.bookmark;
   $("bModes").hidden=!!o.bookmark||!!o.noModes;
   $("bModes").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(!!LK.cur&&b.dataset.m===LK.cur.mode)));
   $("bPin").hidden=$("bCopy").hidden=!o.canPin||!!o.bookmark;
@@ -1454,7 +1458,7 @@ function cacheGet(k){const m=store.get("marginalia.lk",{});return m[k]}
 function cachePut(k,v){const m=store.get("marginalia.lk",{});delete m[k];m[k]=v;const ks=Object.keys(m);while(ks.length>150)delete m[ks.shift()];store.set("marginalia.lk",m)}
 async function streamAnswer(payload,onText,signal){
   const res=await fetch(API_URL,{method:"POST",signal,headers:{"content-type":"application/json","x-api-key":getKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:prefs.model||"claude-haiku-5-5",max_tokens:payload.max||450,stream:true,system:payload.system,messages:[{role:"user",content:payload.user}]})});
+    body:JSON.stringify({model:prefs.model||"claude-haiku-5-5",max_tokens:payload.max||450,stream:true,system:payload.system,messages:payload.messages||[{role:"user",content:payload.user}]})});
   if(!res.ok){
     let msg="";try{const j=await res.json();msg=(j.error&&j.error.message)||""}catch(e){}
     const err=new Error(msg||("HTTP "+res.status));err.status=res.status;throw err;
@@ -1478,6 +1482,7 @@ const BASE="You are a reading companion inside an ebook reader. The reader has s
 const MODES={
   define:{max:300,task:"Define the selected text.",sys:"Define the selected word or phrase as it is used in this passage, in one or two easy sentences, as you would to a 13-year-old. Start with what it means here, using simpler words than the one you are defining. If it is old-fashioned, say so and name the everyday word we use now. If it is a name, say who or what it is. Add a very short example only if it really helps. At most 40 words."},
   explain:{max:500,task:"Explain the selected text.",sys:"Explain what the selection means here, as if telling a friend your own age who got stuck. For a word, say what it means in simple words and mention if it is old-fashioned. For a name or reference, say who or what it is. For a longer passage, retell it in plain modern words and say what is going on. About 60 words at most."},
+  ask:{max:700,sys:"The reader has typed their own question about the selected text. Answer that question directly, using the text provided first. If the answer is not in the text, say so briefly and then answer from general knowledge, making clear which is which. Do not reveal plot developments beyond what the provided text shows. Keep it focused, about 100 words at most unless the question clearly needs more."},
   simplify:{max:800,task:"Rewrite the selected text in simpler language.",sys:"Rewrite the selected text so a student who finds the original too hard can read it easily. Keep the same meaning, the same events and the same order, and keep every name. Use short sentences and everyday words, and replace old-fashioned or difficult words and long, winding sentences with plain ones. Keep dialogue as dialogue and keep who is speaking. Do not add explanations, opinions or new details, and do not leave anything out that matters to the story. The result should be about as long as the original, or a little longer if that makes it clearer. Give only the rewritten text, with no introduction and no quotation marks around it."},
   analysis:{max:900,task:"Write a short literary analysis of the selected text.",sys:"Give a short, easy-to-follow literary analysis of the selected passage, for a student who is new to analysing books. Say what the author is doing and how (for example the mood, a hidden meaning, a comparison, humour or irony, or what we learn about a character), and why it matters for the story. Point to specific words from the text. Explain any literary term in plain words the first time you use it. About 120 words at most."}
 };
@@ -1505,6 +1510,7 @@ function bookLine(){
 }
 async function runLookup(info,mode){
   mode=MODES[mode]?mode:"explain";
+  if(mode==="ask"){openAsk(info);return}
   bubClose(false);LK.info=info;LK.mode=mode;
   const c=book.pos.c,sel=info.text.slice(0,500),ctx=contextFor(info);
   showBub({first:info.rects[0],last:info.rects[info.rects.length-1]});
@@ -1529,6 +1535,43 @@ async function runLookup(info,mode){
     setBub({...base,a:m,cls:"err"});
   }
 }
+/* Ask: type your own question about the selected text; follow-up questions keep the conversation */
+function askText(turns){return turns.map(t=>"Q: "+t.q+"\n"+(t.a||"…")).join("\n\n")}
+function openAsk(info){
+  bubClose(false);LK.info=info;LK.mode="ask";
+  const c=book.pos.c,sel=info.text.slice(0,500);
+  showBub({first:info.rects[0],last:info.rects[info.rects.length-1]});
+  LK.cur={c,anchor:info.anchor,q:sel,mode:"ask",a:"",turns:[]};
+  setBub({q:short(sel),a:"What would you like to know about this? Type your question below.",cls:"wait"});
+  $("bAskQ").value="";$("bAskQ").focus();
+}
+async function askQuestion(question){
+  question=(question||"").trim();const cur=LK.cur;
+  if(!question||!cur||cur.mode!=="ask")return;
+  const info=LK.info;if(!info)return;
+  if(!getKey()){LK.askQ=question;setBub({q:short(cur.q),a:"Add your Anthropic API key to get answers. Paste it here; it stays in this browser.",cls:"wait",needKey:true});$("bKey").focus();return}
+  if(LK.ctl){try{LK.ctl.abort()}catch(e){}}
+  const ctl=LK.ctl=new AbortController(),c=cur.c,ctx=contextFor(info),ch=book.chapters[c];
+  const turn={q:question,a:""};cur.turns.push(turn);$("bAskQ").value="";
+  const first=bookLine()+"Chapter: "+(ch?ch.title:"")+"\n\nText around the selection:\n<<<\n"+ctx+"\n>>>\n\nSelected text:\n<<<\n"+cur.q+"\n>>>\n\nStudent's question: "+cur.turns[0].q;
+  const messages=[{role:"user",content:first}];
+  cur.turns.slice(0,-1).forEach((t,i)=>{if(i>0)messages.push({role:"user",content:t.q});messages.push({role:"assistant",content:t.a})});
+  if(cur.turns.length>1)messages.push({role:"user",content:question});
+  const base={q:short(cur.q)},show=(cls)=>{cur.a=turn.a;cur.ask=turn.q;setBub({...base,a:askText(cur.turns),cls,canPin:!!cur.anchor&&!!turn.a&&!cls});const b=$("ba");b.scrollTop=b.scrollHeight};
+  show("wait");
+  try{
+    const out=await streamAnswer({system:BASE+" "+MODES.ask.sys+" "+langInstruction(),messages,max:MODES.ask.max},t=>{if(LK.cur===cur){turn.a=t;show("")}},ctl.signal);
+    if(LK.cur!==cur)return;
+    turn.a=out.trim();show("");$("bAskQ").focus();
+  }catch(err){
+    if(LK.cur!==cur)return;
+    const m=friendly(err);if(m===null)return;
+    cur.turns.pop();
+    setBub({...base,a:(cur.turns.length?askText(cur.turns)+"\n\n":"")+m,cls:"err"});
+  }
+}
+$("bAskGo").onclick=()=>askQuestion($("bAskQ").value);
+$("bAskQ").addEventListener("keydown",e=>{e.stopPropagation();if(e.key==="Enter"){e.preventDefault();askQuestion($("bAskQ").value)}else if(e.key==="Escape"){bubClose(true)}});
 pill.addEventListener("click",e=>{
   const b=e.target.closest("button");if(!b)return;
   const info=selectionInfo();if(!info)return;
@@ -1536,7 +1579,7 @@ pill.addEventListener("click",e=>{
 });
 $("bModes").addEventListener("click",e=>{const b=e.target.closest("button");if(!b||!LK.info)return;runLookup(LK.info,b.dataset.m)});
 function saveKey(v){v=(v||"").trim();if(!v)return false;store.set("marginalia.apikey",v);keyNote();return true}
-$("bKeySave").onclick=()=>{if(saveKey($("bKey").value)){$("bKey").value="";const sel=selectionInfo()||LK.info;if(sel&&LK.mode==="word")addWord(sel);else if(sel)runLookup(sel,LK.mode);else bubClose(true)}};
+$("bKeySave").onclick=()=>{if(saveKey($("bKey").value)){$("bKey").value="";const sel=selectionInfo()||LK.info;if(LK.mode==="ask"&&LK.askQ){const q=LK.askQ;LK.askQ=null;askQuestion(q)}else if(sel&&LK.mode==="word")addWord(sel);else if(sel)runLookup(sel,LK.mode);else bubClose(true)}};
 $("bKey").addEventListener("keydown",e=>{if(e.key==="Enter")$("bKeySave").click();e.stopPropagation()});
 $("bX").onclick=()=>bubClose(true);
 $("bCopy").onclick=()=>{if(LK.cur&&LK.cur.a){try{navigator.clipboard.writeText(LK.cur.a)}catch(e){}$("bCopy").textContent="Copied";setTimeout(()=>{$("bCopy").textContent="Copy"},1200)}};
@@ -1544,7 +1587,7 @@ $("bPin").onclick=()=>{
   const cur=LK.cur;if(!cur||!cur.a||!cur.anchor)return;
   const ex=findNote(cur.c,cur.anchor),same=ex&&ex.mode===cur.mode&&ex.a===cur.a;
   if(ex)notesOf().splice(notesOf().indexOf(ex),1);
-  if(!same)notesOf().push({id:Date.now(),c:cur.c,s:cur.anchor.s0,a0:cur.anchor,q:cur.q,a:cur.a,mode:cur.mode,t:Date.now()});
+  if(!same)notesOf().push({id:Date.now(),c:cur.c,s:cur.anchor.s0,a0:cur.anchor,q:cur.q,a:cur.a,ask:cur.mode==="ask"?cur.ask:undefined,mode:cur.mode,t:Date.now()});
   try{getSelection().removeAllRanges()}catch(e){}
   putBook(book);refreshMarks();renderNotes();
   if(LK.view)setBub(LK.view);
@@ -1563,8 +1606,8 @@ function openMark(mk){
     const n=notesOf().find(x=>x.id===id);if(!n)return;
     const rec=V.sents[n.a0.s0];
     LK.info={text:n.q,rects,anchor:n.a0,sp:rec?rec.el:null};
-    LK.cur={c:n.c,anchor:n.a0,q:n.q,mode:n.mode||"explain",a:n.a};LK.mode=LK.cur.mode;
-    setBub({q:short(n.q),a:n.a,canPin:true});
+    LK.cur={c:n.c,anchor:n.a0,q:n.q,mode:n.mode||"explain",a:n.a,ask:n.ask,turns:n.ask?[{q:n.ask,a:n.a}]:undefined};LK.mode=LK.cur.mode;
+    setBub({q:short(n.q),a:n.ask?"Q: "+n.ask+"\n"+n.a:n.a,canPin:true});
   }else{
     const b=marksOf().find(x=>x.id===id);if(!b)return;
     LK.cur={c:b.c,bmId:id,q:b.q,mode:"explain"};
@@ -1894,7 +1937,7 @@ function renderNotes(){
     const q=document.createElement("span");q.className="nq";
     const tg=document.createElement("span");tg.className="tag";tg.textContent=MODE_NAME[n.mode]||"Explain";
     q.append(tg,document.createTextNode("“"+(n.q.length>80?n.q.slice(0,80)+"…":n.q)+"”"));
-    const a=document.createElement("span");a.className="na";a.textContent=n.a;
+    const a=document.createElement("span");a.className="na";a.textContent=(n.ask?"Q: "+n.ask+" \u2014 ":"")+n.a;
     go.append(q,a);
     go.onclick=()=>{
       closeAll();if(book.pos.c!==n.c)showChapter(n.c,0);
@@ -1906,7 +1949,7 @@ function renderNotes(){
     li.append(go,d);ul.append(li);
   });
 }
-const MODE_NAME={define:"Define",explain:"Explain",simplify:"Simplify",analysis:"Analysis"};
+const MODE_NAME={ask:"Ask",define:"Define",explain:"Explain",simplify:"Simplify",analysis:"Analysis"};
 function keyNote(){$("keyNote").textContent=getKey()?"A key is saved in this browser.":"No key saved yet."}
 $("sKeySave").onclick=()=>{if(saveKey($("sKey").value))$("sKey").value=""};
 $("sKeyClear").onclick=()=>{store.set("marginalia.apikey","");$("sKey").value="";keyNote()};
