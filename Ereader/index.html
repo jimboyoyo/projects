@@ -52,6 +52,9 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 #flow figure.plate:hover .pbar,#flow figure.plate:focus-within .pbar{opacity:1}
 @media (hover:none){#flow figure.plate .pbar{opacity:1}}
 #flow figure.plate .pbar button{font:inherit;font-family:var(--font-ui);font-size:.7em;padding:.25em .7em;border:1px solid var(--line);border-radius:99px;background:var(--bg);color:var(--fg);cursor:pointer}
+#flow figure.plate .pprompt{display:none;position:absolute;left:4%;right:4%;bottom:3.4em;max-height:55%;overflow:auto;padding:.7em .9em;border-radius:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);box-shadow:0 2px 12px rgba(0,0,0,.3);font-family:var(--font-ui);font-size:.74em;line-height:1.45;text-align:left;user-select:text;-webkit-user-select:text}
+#flow figure.plate.showp .pprompt{display:block}
+#printArea .pprompt{display:none!important}
 #flow.noplate figure.plate{display:none}
 #printArea .pbar{display:none!important}
 .prbody{display:grid;gap:10px;padding:14px;font-family:var(--font-ui);font-size:.92rem}
@@ -1840,8 +1843,9 @@ function plateEl(p){
   const im=document.createElement("img");im.src=plateUrl(p);im.alt=p.cap||"Illustration";im.draggable=false;
   const cp=document.createElement("figcaption");cp.textContent=(p.cap?p.cap+" · ":"")+"AI-generated illustration";
   const bar=document.createElement("div");bar.className="pbar";
-  [["redo","Draw again"],["del","Remove"]].forEach(([a,t])=>{const b=document.createElement("button");b.type="button";b.dataset.act=a;b.textContent=t;bar.append(b)});
-  f.append(im,cp,bar);return f;
+  [["prompt","Show prompt"],["redo","Draw again"],["del","Remove"]].forEach(([a,t])=>{const b=document.createElement("button");b.type="button";b.dataset.act=a;b.textContent=t;bar.append(b)});
+  const pp=document.createElement("div");pp.className="pprompt";pp.textContent=p.prompt||"No prompt was saved for this picture.";
+  f.append(im,pp,cp,bar);return f;
 }
 function placePlate(p){          // put the figure after the sentence p.after; split the paragraph there when needed
   const rec=V.sents[p.after];if(!rec)return null;
@@ -1943,6 +1947,7 @@ flow.addEventListener("click",e=>{
   const b=e.target.closest&&e.target.closest("figure.plate button");if(!b)return;
   e.stopPropagation();
   const p=(book.plates||[]).find(x=>String(x.id)===b.closest("figure").dataset.id);if(!p)return;
+  if(b.dataset.act==="prompt"){const f=b.closest("figure"),on=f.classList.toggle("showp");b.textContent=on?"Hide prompt":"Show prompt";return}
   if(b.dataset.act==="redo"){makePlate(p);return}
   if(PL.armed===p.id){PL.armed=null;removePlate(p);return}
   PL.armed=p.id;b.textContent="Really remove?";setTimeout(()=>{if(PL.armed===p.id){PL.armed=null;b.textContent="Remove"}},3000);
