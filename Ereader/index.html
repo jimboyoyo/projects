@@ -1838,7 +1838,8 @@ $("imgBox").addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault
 /* ---------- illustrations: a full picture page after the left page of a spread ---------- */
 const PL={busy:false,ctl:null,urls:new Map(),armed:null};
 const DEF_STYLE="vintage ink and watercolour book illustration, soft muted colours";
-const ART_SYS="You write prompts for an AI image generator that paints ONE illustration for a page of a novel. The readers are teenagers. Pick the single most visual moment on the page and describe it concretely: who is there (use the looks in the character notes, and invent consistent details for new characters), where, what they are doing, the mood and the light. Use clothing and settings that fit the period of the book. Show violence or fear indirectly; nothing gory, naked or sexual. There must be no text, letters or writing in the picture. Do not put the book title or author in the prompt. Answer in exactly three lines with these labels:\nCAPTION: a plain caption of 6 to 14 words for the reader, in the language of the page text.\nPROMPT: the image prompt in English, 45 to 80 words, ending with the style you were given.\nCAST: updated character notes in English (name: age, hair, clothing), at most 70 words in total, keeping the earlier notes and adding any new characters from this page.";
+const ART_SYS="You write the prompt for an AI image generator that paints ONE illustration for a page of a novel. The readers are teenagers. Pick the single most visual moment on the page and describe only what is visible, in plain positive wording: who is there (use the looks in the character notes, and invent consistent details for new characters), where, what they are doing, the mood and the light. Use clothing and settings that fit the period of the book. Choose a moment and an angle that show fear or violence indirectly (a shadow, a reaction, a distance) so the picture is gentle enough for teenagers, but never write words like no, not, nothing, without, gory or violent in the prompt, and do not mention text, letters or the book. Write 45 to 80 English words and end with the style you are given. Answer with the prompt only.";
+const META_SYS="You help caption an illustration of a novel for teenagers. Answer with exactly two lines and nothing else. Line 1: a plain caption of 6 to 14 words, in the language of the page text. Line 2: character notes in English (name: age, hair, clothing) in at most 70 words, keeping the earlier notes and adding any new characters from this page.";
 const plateOK=()=>LP===2&&LC===1;
 function plateUI(){const b=$("plateBtn");if(b)b.hidden=!(book&&!$("reader").hidden&&plateOK())}
 function plateUrl(p){let u=PL.urls.get(p.id);if(!u){u=URL.createObjectURL(p.blob);PL.urls.set(p.id,u)}return u}
@@ -1884,11 +1885,6 @@ function leftPageText(){      // the sentences that end on the left page of this
   const text=ids.map(i=>V.sents[i].el.textContent).join(" ").replace(/\s+/g," ").trim();
   return {after:ids[ids.length-1],text:text.slice(0,2200)};
 }
-function parseArt(t){
-  t=String(t||"").replace(/\*\*|__|`/g,"").replace(/^\s*#+\s*/gm,"");
-  const g=(re)=>{const m=re.exec(t);return m?m[1].trim():""};
-  return {cap:g(/CAPTION:\s*(.+)/i).replace(/^["“]|["”]$/g,""),prompt:g(/PROMPT:\s*([\s\S]*?)(?=\n\s*CAST:|$)/i),cast:g(/CAST:\s*([\s\S]*)$/i)};
-}
 async function relayImage(prompt,signal){
   let res;
   try{res=await fetch(relayAddr()+"/image",{method:"POST",signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt})})}
@@ -1917,19 +1913,21 @@ async function makePlate(redo){
     const ch=bk.chapters[c];
     const user=bookLine()+"Chapter: "+(ch?ch.title:"")+"\nStyle: "+style+"\nCharacter notes so far: "+(art.cast||"none yet")+(old&&old.prompt?"\nThe previous picture for this page used: "+old.prompt+"\nChoose a different moment or composition this time.":"")+"\n\nPage text:\n"+text;
     const usable=t=>String(t||"").replace(/\*\*/g,"").trim().length>=10;
-    let raw=await streamAnswer({system:ART_SYS,user,max:1500},()=>{},ctl.signal),why=SA.stop+"/"+SA.blocks.join("+");
-    let a=parseArt(raw),prompt=a.prompt||String(raw||"").replace(/\*\*/g,"").trim();
+    const clean=t=>String(t||"").replace(/\*\*|`/g,"").replace(/^\s*(?:prompt|image prompt)\s*:\s*/i,"").replace(/^["\u201C]|["\u201D]$/g,"").trim();
+    let raw=await streamAnswer({system:ART_SYS,user,max:1000},()=>{},ctl.signal),prompt=clean(raw);
     if(!usable(prompt)){
-      console.warn("Illustration: unusable answer from Claude:",JSON.stringify(raw),why);
-      // second try with a plainer request: just the prompt, no labels
-      const plain="Write one prompt for an AI image generator that paints a single illustration of the most visual moment on this page of a novel. The readers are teenagers. Describe who is there, where, what they are doing, the mood and the light, in 45 to 80 English words. Show violence or fear indirectly; nothing gory or sexual. No text or letters in the picture. Do not name the book or its author. End with the style you are given. Answer with the prompt only.";
-      raw=await streamAnswer({system:plain,user,max:1000},()=>{},ctl.signal);
-      a={cap:"",prompt:String(raw||"").replace(/\*\*/g,"").replace(/^\s*PROMPT:\s*/i,"").trim(),cast:""};prompt=a.prompt;
+      console.warn("Illustration: unusable answer from Claude:",JSON.stringify(raw),SA.stop+"/"+SA.blocks.join("+"));
+      raw=await streamAnswer({system:ART_SYS,user,max:1000},()=>{},ctl.signal);prompt=clean(raw);
       if(!usable(prompt)){console.warn("Illustration: second answer unusable:",JSON.stringify(raw),SA.stop+"/"+SA.blocks.join("+"));
         throw new Error("Claude gave no picture description (ended: "+(SA.stop||"unknown")+"; parts: "+(SA.blocks.join(", ")||"none")+"). Tell me this message so I can fix it.")}
     }
     if(!prompt.toLowerCase().includes(style.slice(0,24).toLowerCase()))prompt+=". "+style;
+    // the caption and character notes are asked for while the picture is being painted; if that fails the picture still works
+    const metaP=streamAnswer({system:META_SYS,user:"Character notes so far: "+(art.cast||"none yet")+"\nPicture prompt: "+prompt+"\n\nPage text:\n"+text,max:500},()=>{},ctl.signal)
+      .then(t=>{const ls=String(t||"").replace(/\*\*/g,"").split(/\n+/).map(x=>x.replace(/^\s*(?:caption|character notes|cast|line \d)\s*:\s*/i,"").trim()).filter(Boolean);return {cap:(ls[0]||"").replace(/^["\u201C]|["\u201D]$/g,"").slice(0,160),cast:ls.slice(1).join(" ")}})
+      .catch(()=>null);
     const blob=await relayImage(prompt,ctl.signal);
+    const a=(await metaP)||{cap:"",cast:""};
     if(a.cast)art.cast=a.cast.slice(0,600);
     let p;
     if(old){p=old;if(PL.urls.has(p.id)){URL.revokeObjectURL(PL.urls.get(p.id));PL.urls.delete(p.id)}p.blob=blob;p.cap=a.cap||p.cap;p.prompt=prompt;p.text=text;p.t=Date.now()}
