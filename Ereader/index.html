@@ -1477,7 +1477,9 @@ function langInstruction(){
 function lkKey(c,mode,sel){return "s2|"+book.id+"|"+c+"|"+prefs.model+"|"+langInstruction()+"|"+mode+"|"+sel}
 function cacheGet(k){const m=store.get("marginalia.lk",{});return m[k]}
 function cachePut(k,v){const m=store.get("marginalia.lk",{});delete m[k];m[k]=v;const ks=Object.keys(m);while(ks.length>150)delete m[ks.shift()];store.set("marginalia.lk",m)}
+const SA={stop:"",blocks:[]};          // what the last answer looked like, for error messages
 async function streamAnswer(payload,onText,signal){
+  SA.stop="";SA.blocks=[];
   const res=await fetch(API_URL,{method:"POST",signal,headers:{"content-type":"application/json","x-api-key":getKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
     body:JSON.stringify({model:prefs.model||"claude-haiku-5-5",max_tokens:payload.max||450,stream:true,system:payload.system,messages:payload.messages||[{role:"user",content:payload.user}]})});
   if(!res.ok){
@@ -1492,6 +1494,8 @@ async function streamAnswer(payload,onText,signal){
       const line=buf.slice(0,ix).trim();buf=buf.slice(ix+1);
       if(!line.startsWith("data:"))continue;
       try{const j=JSON.parse(line.slice(5));
+        if(j.type==="content_block_start"&&j.content_block)SA.blocks.push(j.content_block.type);
+        else if(j.type==="message_delta"&&j.delta&&j.delta.stop_reason)SA.stop=j.delta.stop_reason;
         if(j.type==="content_block_delta"&&j.delta&&j.delta.text){out+=j.delta.text;onText(out)}
         else if(j.type==="error")throw new Error((j.error&&j.error.message)||"The API reported an error.")}
       catch(e){if(e.message&&!(e instanceof SyntaxError))throw e}
@@ -1912,14 +1916,17 @@ async function makePlate(redo){
     const art=bk.art||(bk.art={}),style=(prefs.artStyle||"").trim()||DEF_STYLE;
     const ch=bk.chapters[c];
     const user=bookLine()+"Chapter: "+(ch?ch.title:"")+"\nStyle: "+style+"\nCharacter notes so far: "+(art.cast||"none yet")+(old&&old.prompt?"\nThe previous picture for this page used: "+old.prompt+"\nChoose a different moment or composition this time.":"")+"\n\nPage text:\n"+text;
-    let raw=await streamAnswer({system:ART_SYS,user,max:700},()=>{},ctl.signal);
-    if(!raw||raw.trim().length<10)raw=await streamAnswer({system:ART_SYS,user,max:700},()=>{},ctl.signal);   // one retry on an empty answer
+    const usable=t=>String(t||"").replace(/\*\*/g,"").trim().length>=10;
+    let raw=await streamAnswer({system:ART_SYS,user,max:1500},()=>{},ctl.signal),why=SA.stop+"/"+SA.blocks.join("+");
     let a=parseArt(raw),prompt=a.prompt||String(raw||"").replace(/\*\*/g,"").trim();
-    if(!prompt||prompt.length<10){
-      // Claude gave nothing usable: fall back to a plain prompt built from the page itself
-      console.warn("Illustration: unusable answer from Claude:",JSON.stringify(raw));
-      a={cap:"",prompt:"",cast:""};
-      prompt="An illustration for a scene in the novel: "+text.slice(0,400).replace(/["\n]/g," ")+" Showing the people and place described.";
+    if(!usable(prompt)){
+      console.warn("Illustration: unusable answer from Claude:",JSON.stringify(raw),why);
+      // second try with a plainer request: just the prompt, no labels
+      const plain="Write one prompt for an AI image generator that paints a single illustration of the most visual moment on this page of a novel. The readers are teenagers. Describe who is there, where, what they are doing, the mood and the light, in 45 to 80 English words. Show violence or fear indirectly; nothing gory or sexual. No text or letters in the picture. Do not name the book or its author. End with the style you are given. Answer with the prompt only.";
+      raw=await streamAnswer({system:plain,user,max:1000},()=>{},ctl.signal);
+      a={cap:"",prompt:String(raw||"").replace(/\*\*/g,"").replace(/^\s*PROMPT:\s*/i,"").trim(),cast:""};prompt=a.prompt;
+      if(!usable(prompt)){console.warn("Illustration: second answer unusable:",JSON.stringify(raw),SA.stop+"/"+SA.blocks.join("+"));
+        throw new Error("Claude gave no picture description (ended: "+(SA.stop||"unknown")+"; parts: "+(SA.blocks.join(", ")||"none")+"). Tell me this message so I can fix it.")}
     }
     if(!prompt.toLowerCase().includes(style.slice(0,24).toLowerCase()))prompt+=". "+style;
     const blob=await relayImage(prompt,ctl.signal);
