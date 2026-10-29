@@ -1877,6 +1877,7 @@ function leftPageText(){      // the sentences that end on the left page of this
   return {after:ids[ids.length-1],text:text.slice(0,2200)};
 }
 function parseArt(t){
+  t=String(t||"").replace(/\*\*|__|`/g,"").replace(/^\s*#+\s*/gm,"");
   const g=(re)=>{const m=re.exec(t);return m?m[1].trim():""};
   return {cap:g(/CAPTION:\s*(.+)/i).replace(/^["“]|["”]$/g,""),prompt:g(/PROMPT:\s*([\s\S]*?)(?=\n\s*CAST:|$)/i),cast:g(/CAST:\s*([\s\S]*)$/i)};
 }
@@ -1907,9 +1908,15 @@ async function makePlate(redo){
     const art=bk.art||(bk.art={}),style=(prefs.artStyle||"").trim()||DEF_STYLE;
     const ch=bk.chapters[c];
     const user=bookLine()+"Chapter: "+(ch?ch.title:"")+"\nStyle: "+style+"\nCharacter notes so far: "+(art.cast||"none yet")+(old&&old.prompt?"\nThe previous picture for this page used: "+old.prompt+"\nChoose a different moment or composition this time.":"")+"\n\nPage text:\n"+text;
-    const raw=await streamAnswer({system:ART_SYS,user,max:600},()=>{},ctl.signal);
-    const a=parseArt(raw);let prompt=a.prompt||raw.trim();
-    if(!prompt||prompt.length<10)throw new Error("Claude did not give a picture description. Try again.");
+    let raw=await streamAnswer({system:ART_SYS,user,max:700},()=>{},ctl.signal);
+    if(!raw||raw.trim().length<10)raw=await streamAnswer({system:ART_SYS,user,max:700},()=>{},ctl.signal);   // one retry on an empty answer
+    let a=parseArt(raw),prompt=a.prompt||String(raw||"").replace(/\*\*/g,"").trim();
+    if(!prompt||prompt.length<10){
+      // Claude gave nothing usable: fall back to a plain prompt built from the page itself
+      console.warn("Illustration: unusable answer from Claude:",JSON.stringify(raw));
+      a={cap:"",prompt:"",cast:""};
+      prompt="An illustration for a scene in the novel: "+text.slice(0,400).replace(/["\n]/g," ")+" Showing the people and place described.";
+    }
     if(!prompt.toLowerCase().includes(style.slice(0,24).toLowerCase()))prompt+=". "+style;
     const blob=await relayImage(prompt,ctl.signal);
     if(a.cast)art.cast=a.cast.slice(0,600);
