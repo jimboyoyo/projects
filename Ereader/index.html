@@ -42,7 +42,18 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 #fnBand .fnp b{color:var(--fg);font-weight:600}
 #fnBand .fnp sup{color:var(--accent);font-weight:600;margin-right:.3em;font-size:.85em}
 #wlCopy{margin:2px 0 6px}
-#printBtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vertical-align:-3px}
+#printBtn svg,#plateBtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vertical-align:-3px}
+#plateBtn.busy{animation:platepulse 1.1s ease-in-out infinite}
+@keyframes platepulse{50%{opacity:.35}}
+#flow figure.plate{break-before:column;break-after:column;break-inside:avoid;margin:0;height:calc(var(--ph,400px) - 2px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.7em;text-indent:0;user-select:none;-webkit-user-select:none;position:relative}
+#flow figure.plate img{max-width:100%;max-height:calc(var(--ph,400px) - 5em);width:auto;height:auto;border-radius:3px;box-shadow:0 1px 8px rgba(0,0,0,.25);background:var(--line)}
+#flow figure.plate figcaption{font-family:var(--font-ui);font-size:.72em;line-height:1.35;color:var(--muted);text-align:center;max-width:92%}
+#flow figure.plate .pbar{display:flex;gap:6px;opacity:0;transition:opacity .15s}
+#flow figure.plate:hover .pbar,#flow figure.plate:focus-within .pbar{opacity:1}
+@media (hover:none){#flow figure.plate .pbar{opacity:1}}
+#flow figure.plate .pbar button{font:inherit;font-family:var(--font-ui);font-size:.7em;padding:.25em .7em;border:1px solid var(--line);border-radius:99px;background:var(--bg);color:var(--fg);cursor:pointer}
+#flow.noplate figure.plate{display:none}
+#printArea .pbar{display:none!important}
 .prbody{display:grid;gap:10px;padding:14px;font-family:var(--font-ui);font-size:.92rem}
 .prbody label{display:flex;gap:8px;align-items:baseline}
 .prbody label span{color:var(--muted);font-size:.82rem}
@@ -247,6 +258,7 @@ html.reading{overflow:hidden}
   <span class="title-line" id="tline" hidden></span>
   <button class="btn" id="bmBtn" type="button" aria-pressed="false" aria-label="Bookmark this page" title="Bookmark this page (B)" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
   <button class="btn" id="printBtn" type="button" aria-label="Print" title="Print (Ctrl+P)" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/></svg></button>
+  <button class="btn" id="plateBtn" type="button" aria-label="Illustrate this page" title="Illustrate the left page: a picture page is added on the right" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 16l4-4 4 4 3-3 5 5M15.5 9.5h.01"/></svg></button>
   <button class="btn" id="lineBtn" type="button" aria-pressed="false" title="Line focus: highlight the line you are reading" hidden>Line focus</button>
   <button class="btn" id="listenBtn" type="button" aria-pressed="false" hidden>Listen</button>
   <button class="btn" id="tocBtn" type="button" hidden>Contents</button>
@@ -324,6 +336,9 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Pages shown</label><div class="seg" id="sSpread"><button data-v="false" type="button">Single page</button><button data-v="true" type="button">Two-page spread</button></div></div>
   <div class="ctl"><label>Columns per page</label><div class="seg" id="sCols"><button data-v="1" type="button">1</button><button data-v="2" type="button">2</button><button data-v="3" type="button">3</button></div></div>
   <p class="note" id="layNote"></p>
+  <h3 style="margin-top:6px">Illustrations</h3>
+  <div class="ctl"><label for="artStyle">Picture style (optional)</label><input id="artStyle" type="text" maxlength="120" placeholder="vintage ink and watercolour book illustration"></div>
+  <p class="note">In a two-page spread with one column per page, the picture button in the header makes an illustration of the left page and adds it as a full picture page on the right. It needs the web-link relay with image support (see the README).</p>
   <h3 style="margin-top:6px">Voice</h3>
   <div class="ctl"><label>Voice engine</label><div class="seg" id="sEngine"><button data-v="natural" type="button">Natural</button><button data-v="browser" type="button">Browser</button></div></div>
   <div class="ctl"><label for="vSel">Voice</label><select id="vSel"></select></div>
@@ -738,7 +753,7 @@ function fillChapter(){
     afterBreak=false;flow.append(e);
   });
   document.querySelectorAll("#toc button").forEach((b,j)=>b.setAttribute("aria-current",j===book.pos.c));
-  markNotes();LF.lines=null;LF.cur=-1;LF.hover=-1;
+  insertPlates();markNotes();LF.lines=null;LF.cur=-1;LF.hover=-1;
 }
 let LP=1,LC=1,leaves=1,GEO=null;
 function layout(){
@@ -766,13 +781,16 @@ function layout(){
   const paper=$("paper");paper.style.width=paperW+"px";paper.style.height=H+"px";paper.classList.toggle("book",book2);
   view.style.left=(book2?Math.round(G/2):0)+"px";view.style.top=vTop+"px";view.style.width=pageW+"px";view.style.height=(H-vTop-vBot-fnH)+"px";GEO={paperW,H,vTop,viewH:H-vTop-vBot-fnH,fnH,left:book2?Math.round(G/2):0,size};{const fb=$("fnBand");fb.style.left=view.style.left;fb.style.top=(vTop+H-vTop-vBot-fnH)+"px";fb.style.width=pageW+"px";fb.style.height=Math.max(0,fnH-4)+"px";fb.style.fontSize=(size*0.68)+"px"}
   flow.style.width=pageW+"px";flow.style.columnCount=N;flow.style.columnGap=G+"px";
+  flow.style.setProperty("--ph",Math.max(120,GEO.viewH)+"px");flow.classList.toggle("noplate",!(P===2&&C===1));
   // count the columns that hold text, from where the last element ends
   const fr=flow.getBoundingClientRect(),last=flow.lastElementChild;let tc=1;
   if(last){const rs=last.getClientRects(),r=rs[rs.length-1];if(r)tc=Math.max(1,Math.floor((r.right-fr.left-1)/(colW+G))+1)}
   pages=Math.max(1,Math.ceil(tc/N-1e-3));leaves=Math.max(1,Math.ceil(tc/C-1e-3));
   const ln=$("layNote");
   if(ln){let m=(P===2?"Two pages":"One page")+", "+C+(C===1?" column":" columns")+(P===2?" each":"")+".";
-    if(P<(prefs.spread?2:1)||C<prefs.cols)m+=" Your window is too narrow for the full setting, so it was reduced.";ln.textContent=m}
+    if(P<(prefs.spread?2:1)||C<prefs.cols)m+=" Your window is too narrow for the full setting, so it was reduced.";
+    if(P===2&&C>1)m+=" Illustrations need one column per page.";ln.textContent=m}
+  plateUI();
 }
 function showChapter(i,frac){
   i=Math.max(0,Math.min(book.chapters.length-1,i));book.pos.c=i;
@@ -854,7 +872,7 @@ function relayout(){
 }
 let rt=null;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(relayout,150)});
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>setTimeout(relayout,50));
-$("home").onclick=async()=>{if(book)await putBook(book);bubClose();lfSet(false,true,true);$("lineBtn").hidden=true;$("bmBtn").hidden=true;$("printBtn").hidden=true;$("ribbon").hidden=true;$("fnBand").hidden=true;book=null;voiceStop("");wordsClear();V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
+$("home").onclick=async()=>{if(book)await putBook(book);bubClose();lfSet(false,true,true);$("lineBtn").hidden=true;$("bmBtn").hidden=true;$("printBtn").hidden=true;$("plateBtn").hidden=true;$("ribbon").hidden=true;$("fnBand").hidden=true;book=null;voiceStop("");wordsClear();V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
 
 const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",brVoice:"",speed:1,highlight:true,wordHl:true,gpu:false,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,lfExt:0,claudeLang:"auto",claudeLangOther:"",v:2},store.get("marginalia.prefs",{}));
 if((prefs.v||0)<2){prefs.gpu=false;prefs.v=2}   // GPU was on by default before; it is slow to start and unreliable for this model, so CPU is now the default
@@ -1810,6 +1828,121 @@ $("imgQ").addEventListener("input",imgGoogle);$("imgT").addEventListener("change
 $("imgX").onclick=imgClose;$("imgBack").onclick=imgBack;
 $("imgBox").addEventListener("mousedown",e=>{if(e.target===$("imgBox"))imgClose()});
 $("imgBox").addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();if(!$("imgBig").hidden)imgBack();else imgClose()}});
+/* ---------- illustrations: a full picture page after the left page of a spread ---------- */
+const PL={busy:false,ctl:null,urls:new Map(),armed:null};
+const DEF_STYLE="vintage ink and watercolour book illustration, soft muted colours";
+const ART_SYS="You write prompts for an AI image generator that paints ONE illustration for a page of a novel. The readers are teenagers. Pick the single most visual moment on the page and describe it concretely: who is there (use the looks in the character notes, and invent consistent details for new characters), where, what they are doing, the mood and the light. Use clothing and settings that fit the period of the book. Show violence or fear indirectly; nothing gory, naked or sexual. There must be no text, letters or writing in the picture. Do not put the book title or author in the prompt. Answer in exactly three lines with these labels:\nCAPTION: a plain caption of 6 to 14 words for the reader, in the language of the page text.\nPROMPT: the image prompt in English, 45 to 80 words, ending with the style you were given.\nCAST: updated character notes in English (name: age, hair, clothing), at most 70 words in total, keeping the earlier notes and adding any new characters from this page.";
+const plateOK=()=>LP===2&&LC===1;
+function plateUI(){const b=$("plateBtn");if(b)b.hidden=!(book&&!$("reader").hidden&&plateOK())}
+function plateUrl(p){let u=PL.urls.get(p.id);if(!u){u=URL.createObjectURL(p.blob);PL.urls.set(p.id,u)}return u}
+function plateEl(p){
+  const f=document.createElement("figure");f.className="plate";f.dataset.id=p.id;
+  const im=document.createElement("img");im.src=plateUrl(p);im.alt=p.cap||"Illustration";im.draggable=false;
+  const cp=document.createElement("figcaption");cp.textContent=(p.cap?p.cap+" · ":"")+"AI-generated illustration";
+  const bar=document.createElement("div");bar.className="pbar";
+  [["redo","Draw again"],["del","Remove"]].forEach(([a,t])=>{const b=document.createElement("button");b.type="button";b.dataset.act=a;b.textContent=t;bar.append(b)});
+  f.append(im,cp,bar);return f;
+}
+function placePlate(p){          // put the figure after the sentence p.after; split the paragraph there when needed
+  const rec=V.sents[p.after];if(!rec)return null;
+  const old=flow.querySelector('figure.plate[data-id="'+p.id+'"]');if(old)return old;
+  const el=plateEl(p);let blk=rec.el.parentNode;
+  if(blk&&blk.tagName==="P"&&!blk.classList.contains("verse")){
+    const rest=[];for(let n=rec.el.nextSibling;n;n=n.nextSibling)rest.push(n);
+    if(rest.some(x=>x.nodeType===1)){
+      const np=document.createElement("p");np.className="sb cont";rest.forEach(x=>np.append(x));
+      blk.after(el);el.after(np);return el;
+    }
+  }
+  (blk&&blk!==flow?blk:rec.el).after(el);return el;
+}
+function insertPlates(){if(!book||!book.plates)return;book.plates.filter(p=>p.c===book.pos.c).forEach(placePlate)}
+function unplace(p){
+  const f=flow.querySelector('figure.plate[data-id="'+p.id+'"]');if(!f)return;
+  const nx=f.nextElementSibling,pv=f.previousElementSibling;
+  if(nx&&nx.classList.contains("cont")&&pv&&pv.tagName==="P"){while(nx.firstChild)pv.append(nx.firstChild);nx.remove()}
+  f.remove();
+}
+function leafOfRect(r){const fr=flow.getBoundingClientRect(),cw=(pageW-gap)/2;return Math.floor((r.left-fr.left+4)/(cw+gap))}
+function leftPageText(){      // the sentences that end on the left page of this spread
+  const L=page*2,ids=[];
+  for(let i=0;i<V.sents.length;i++){
+    const rs=V.sents[i].el.getClientRects();if(!rs.length)continue;
+    const b=leafOfRect(rs[rs.length-1]);
+    if(b>L)break;
+    if(b===L)ids.push(i);
+  }
+  if(!ids.length)return null;
+  const text=ids.map(i=>V.sents[i].el.textContent).join(" ").replace(/\s+/g," ").trim();
+  return {after:ids[ids.length-1],text:text.slice(0,2200)};
+}
+function parseArt(t){
+  const g=(re)=>{const m=re.exec(t);return m?m[1].trim():""};
+  return {cap:g(/CAPTION:\s*(.+)/i).replace(/^["“]|["”]$/g,""),prompt:g(/PROMPT:\s*([\s\S]*?)(?=\n\s*CAST:|$)/i),cast:g(/CAST:\s*([\s\S]*)$/i)};
+}
+async function relayImage(prompt,signal){
+  let res;
+  try{res=await fetch(relayAddr()+"/image",{method:"POST",signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt})})}
+  catch(e){if(e.name==="AbortError")throw e;throw new Error("Could not reach the relay. Check the address on the start page.")}
+  if(!res.ok){let m="";try{m=(await res.json()).error||""}catch(e){}throw new Error(m||("The relay answered with an error ("+res.status+")."))}
+  const bl=await res.blob();if(!/^image\//.test(bl.type))throw new Error("The relay did not return a picture. Update the Worker code from the README.");return bl;
+}
+async function makePlate(redo){
+  if(PL.busy){if(PL.ctl)PL.ctl.abort();return}
+  if(!book||!plateOK())return;
+  if(!getKey()){toast("Add your Anthropic API key first (Aa panel, under Lookup).",4000);return}
+  if(!relayAddr()){toast("Illustrations use the web-link relay. Set it up on the start page, then add the Workers AI binding (see the README).",6000);return}
+  bubClose(false);
+  const bk=book,c=bk.pos.c;
+  let after,text,old=null;
+  if(redo){old=redo;after=old.after;text=old.text}
+  else{
+    const t=leftPageText();
+    if(!t){toast("There is no text on the left page to illustrate. Turn to a page with text.",3500);return}
+    after=t.after;text=t.text;old=(bk.plates||[]).find(p=>p.c===c&&p.after===after)||null;
+  }
+  PL.busy=true;const ctl=PL.ctl=new AbortController();$("plateBtn").classList.add("busy");
+  toast("Painting an illustration… this takes about 20 seconds. Click the picture button again to cancel.",90000);
+  try{
+    const art=bk.art||(bk.art={}),style=(prefs.artStyle||"").trim()||DEF_STYLE;
+    const ch=bk.chapters[c];
+    const user=bookLine()+"Chapter: "+(ch?ch.title:"")+"\nStyle: "+style+"\nCharacter notes so far: "+(art.cast||"none yet")+(old&&old.prompt?"\nThe previous picture for this page used: "+old.prompt+"\nChoose a different moment or composition this time.":"")+"\n\nPage text:\n"+text;
+    const raw=await streamAnswer({system:ART_SYS,user,max:600},()=>{},ctl.signal);
+    const a=parseArt(raw);let prompt=a.prompt||raw.trim();
+    if(!prompt||prompt.length<10)throw new Error("Claude did not give a picture description. Try again.");
+    if(!prompt.toLowerCase().includes(style.slice(0,24).toLowerCase()))prompt+=". "+style;
+    const blob=await relayImage(prompt,ctl.signal);
+    if(a.cast)art.cast=a.cast.slice(0,600);
+    let p;
+    if(old){p=old;if(PL.urls.has(p.id)){URL.revokeObjectURL(PL.urls.get(p.id));PL.urls.delete(p.id)}p.blob=blob;p.cap=a.cap||p.cap;p.prompt=prompt;p.text=text;p.t=Date.now()}
+    else{p={id:Date.now(),c,after,cap:a.cap,prompt,text,blob,t:Date.now()};(bk.plates||(bk.plates=[])).push(p)}
+    await putBook(bk);
+    $("toast").hidden=true;
+    if(book===bk&&book.pos.c===c){
+      const f=flow.querySelector('figure.plate[data-id="'+p.id+'"]');
+      if(f){f.replaceWith(plateEl(p))}else{placePlate(p);relayout()}
+    }
+  }catch(err){
+    $("toast").hidden=true;
+    if(err.name!=="AbortError")toast(err.status?(friendly(err)||err.message):err.message,6000);
+  }finally{PL.busy=false;PL.ctl=null;$("plateBtn").classList.remove("busy")}
+}
+function removePlate(p){
+  book.plates=(book.plates||[]).filter(x=>x.id!==p.id);
+  if(PL.urls.has(p.id)){URL.revokeObjectURL(PL.urls.get(p.id));PL.urls.delete(p.id)}
+  unplace(p);putBook(book);relayout();
+}
+flow.addEventListener("click",e=>{
+  const b=e.target.closest&&e.target.closest("figure.plate button");if(!b)return;
+  e.stopPropagation();
+  const p=(book.plates||[]).find(x=>String(x.id)===b.closest("figure").dataset.id);if(!p)return;
+  if(b.dataset.act==="redo"){makePlate(p);return}
+  if(PL.armed===p.id){PL.armed=null;removePlate(p);return}
+  PL.armed=p.id;b.textContent="Really remove?";setTimeout(()=>{if(PL.armed===p.id){PL.armed=null;b.textContent="Remove"}},3000);
+});
+$("plateBtn").onclick=()=>makePlate();
+$("artStyle").value=prefs.artStyle||"";
+$("artStyle").addEventListener("input",e=>{prefs.artStyle=e.target.value.slice(0,120);store.set("marginalia.prefs",prefs)});
 /* ---------- printing: the current layout, page by page, with footnotes ---------- */
 const PR={built:false};
 function teardownPrint(){const a=document.getElementById("printArea");if(a)a.remove();const st=document.getElementById("printPage");if(st)st.remove();PR.built=false}
