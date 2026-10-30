@@ -341,6 +341,7 @@ html.reading{overflow:hidden}
   <p class="note" id="layNote"></p>
   <h3 style="margin-top:6px">Illustrations</h3>
   <div class="ctl"><label for="artStyle">Picture style (optional)</label><input id="artStyle" type="text" maxlength="120" placeholder="vintage ink and watercolour book illustration"></div>
+  <div class="ctl"><label for="artCast">Characters of this book (Claude's notes, you can edit them)</label><textarea id="artCast" rows="7" maxlength="3000" placeholder="Made the first time you illustrate a page. It describes how each character looks, from Claude's knowledge of the book."></textarea><button class="btn" id="artRebuild" type="button" style="margin-top:6px">Ask Claude to rewrite these notes</button></div>
   <p class="note">In a two-page spread with one column per page, the picture button in the header makes an illustration of the left page and adds it as a full picture page on the right. It needs the web-link relay with image support (see the README).</p>
   <h3 style="margin-top:6px">Voice</h3>
   <div class="ctl"><label>Voice engine</label><div class="seg" id="sEngine"><button data-v="natural" type="button">Natural</button><button data-v="browser" type="button">Browser</button></div></div>
@@ -1838,10 +1839,11 @@ $("imgBox").addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault
 /* ---------- illustrations: a full picture page after the left page of a spread ---------- */
 const PL={busy:false,ctl:null,urls:new Map(),armed:null};
 const DEF_STYLE="vintage ink and watercolour book illustration, soft muted colours";
-const ART_SYS="You write the prompt for an AI image generator that paints ONE illustration for a page of a novel. The readers are teenagers. Pick the single most visual moment on the page and describe only what is visible, in plain positive wording: who is there (use the looks in the character notes, and invent consistent details for new characters), where, what they are doing, the mood and the light. Use clothing and settings that fit the period of the book. Choose a moment and an angle that show fear or violence indirectly (a shadow, a reaction, a distance) so the picture is gentle enough for teenagers, but never write words like no, not, nothing, without, gory or violent in the prompt, and do not mention text, letters or the book. Write 45 to 80 English words and end with the style you are given. Answer with the prompt only.";
+const ART_SYS="You write the prompt for an AI image generator that paints ONE illustration for a page of a novel. The readers are teenagers. The image generator knows nothing about the book, so everything it needs must be in the prompt as visual words.\nStep 1, silently work out who is on this page. Use the page text, the earlier text, the character notes and your own knowledge of the book, and identify everyone who appears, including those only called he, she, the creature, the stranger and so on.\nStep 2, pick the single most visual moment and describe it: where it is, who is there and what they are doing, the mood and the light. Use at most three characters.\nStep 3, for every character in the picture, write their physical description straight into the prompt (age, build, face, skin, hair, clothing) from the character notes or from what you know of the book. Never use their names. Keep every character exactly as the book describes them: do not make anyone younger, healthier, taller or more handsome than the book does, and give strange or frightening beings their true unusual features in concrete visual words.\nUse clothing and settings that fit the period of the book. Choose a moment and an angle that show fear or violence indirectly (a shadow, a reaction, a distance), but never write words like no, not, nothing, without, gory or violent, and do not mention text, letters or the book. Write 60 to 110 English words and end with the style you are given. Answer with the prompt only.";
+const BIBLE_SYS="You know many books well. The reader is reading the book named below. List its main characters (up to 8, including creatures and other non-human beings) with their physical appearance exactly as the book describes it: age, build, face, skin, hair and clothing, from your own knowledge of the book. Where the book describes someone as ugly, monstrous, huge, old, disfigured or otherwise not conventionally attractive, say so plainly and concretely; never make anyone more handsome or younger than the book does. Write one line per character in this form: Name (also called: other names or ways the book refers to them): appearance in 20 to 40 words. Then add a last line: Setting: the era, places and usual clothing and surroundings, in 15 to 25 words. Do not mention the plot. If you do not know this book well enough to describe its characters, answer only the word UNKNOWN.";
 const META_SYS="You help caption an illustration of a novel for teenagers. Answer with exactly two lines and nothing else. Line 1: a plain caption of 6 to 14 words, in the language of the page text. Line 2: character notes in English (name: age, hair, clothing) in at most 70 words, keeping the earlier notes and adding any new characters from this page.";
 const plateOK=()=>LP===2&&LC===1;
-function plateUI(){const b=$("plateBtn");if(b)b.hidden=!(book&&!$("reader").hidden&&plateOK())}
+function plateUI(){castShow();const b=$("plateBtn");if(b)b.hidden=!(book&&!$("reader").hidden&&plateOK())}
 function plateUrl(p){let u=PL.urls.get(p.id);if(!u){u=URL.createObjectURL(p.blob);PL.urls.set(p.id,u)}return u}
 function plateEl(p){
   const f=document.createElement("figure");f.className="plate";f.dataset.id=p.id;
@@ -1883,7 +1885,21 @@ function leftPageText(){      // the sentences that end on the left page of this
   }
   if(!ids.length)return null;
   const text=ids.map(i=>V.sents[i].el.textContent).join(" ").replace(/\s+/g," ").trim();
-  return {after:ids[ids.length-1],text:text.slice(0,2200)};
+  const from=Math.max(0,ids[0]-14),before=V.sents.slice(from,ids[0]).map(r=>r.el.textContent).join(" ").replace(/\s+/g," ").trim();
+  return {after:ids[ids.length-1],text:text.slice(0,2200),before:before.slice(-900)};
+}
+async function ensureBible(bk,signal,force){      // Claude writes down how the characters look, from its knowledge of the book
+  const art=bk.art||(bk.art={});
+  if(!force&&(art.bible||art.bibleDone))return;
+  if(bk.web){art.bibleDone=true;return}
+  const bl=bookLine();if(!bl)return;
+  const ch=bk.chapters[bk.pos.c],open=ch&&ch.paras?ch.paras.filter(x=>typeof x==="string").join(" ").slice(0,500):"";
+  try{
+    const t=String(await streamAnswer({system:BIBLE_SYS,user:bl+"Opening of the text the reader has now: "+open,max:1100},()=>{},signal)||"").replace(/\*\*/g,"").trim();
+    if(/^UNKNOWN/i.test(t)||t.length<20){art.bible="";art.bibleDone=true}
+    else{art.bible=t.slice(0,3000);art.bibleDone=true}
+    await putBook(bk);
+  }catch(e){if(e.name==="AbortError")throw e;console.warn("Illustration: character notes failed",e)}
 }
 async function relayImage(prompt,signal){
   let res;
@@ -1899,19 +1915,20 @@ async function makePlate(redo){
   if(!relayAddr()){toast("Illustrations use the web-link relay. Set it up on the start page, then add the Workers AI binding (see the README).",6000);return}
   bubClose(false);
   const bk=book,c=bk.pos.c;
-  let after,text,old=null;
-  if(redo){old=redo;after=old.after;text=old.text}
+  let after,text,before="",old=null;
+  if(redo){old=redo;after=old.after;text=old.text;before=old.before||""}
   else{
     const t=leftPageText();
     if(!t){toast("There is no text on the left page to illustrate. Turn to a page with text.",3500);return}
-    after=t.after;text=t.text;old=(bk.plates||[]).find(p=>p.c===c&&p.after===after)||null;
+    after=t.after;text=t.text;before=t.before||"";old=(bk.plates||[]).find(p=>p.c===c&&p.after===after)||null;
   }
   PL.busy=true;const ctl=PL.ctl=new AbortController();$("plateBtn").classList.add("busy");
   toast("Painting an illustration… this takes about 20 seconds. Click the picture button again to cancel.",90000);
   try{
     const art=bk.art||(bk.art={}),style=(prefs.artStyle||"").trim()||DEF_STYLE;
     const ch=bk.chapters[c];
-    const user=bookLine()+"Chapter: "+(ch?ch.title:"")+"\nStyle: "+style+"\nCharacter notes so far: "+(art.cast||"none yet")+(old&&old.prompt?"\nThe previous picture for this page used: "+old.prompt+"\nChoose a different moment or composition this time.":"")+"\n\nPage text:\n"+text;
+    await ensureBible(bk,ctl.signal);
+    const user=bookLine()+"Chapter: "+(ch?ch.title:"")+"\nStyle: "+style+"\nCharacters of this book:\n"+(art.bible||"(none known)")+"\nExtra notes on characters met so far: "+(art.cast||"none yet")+(before?"\n\nEarlier text, only to help you see who is who:\n"+before:"")+(old&&old.prompt?"\nThe previous picture for this page used: "+old.prompt+"\nChoose a different moment or composition this time.":"")+"\n\nPage text:\n"+text;
     const usable=t=>String(t||"").replace(/\*\*/g,"").trim().length>=10;
     const clean=t=>String(t||"").replace(/\*\*|`/g,"").replace(/^\s*(?:prompt|image prompt)\s*:\s*/i,"").replace(/^["\u201C]|["\u201D]$/g,"").trim();
     let raw=await streamAnswer({system:ART_SYS,user,max:1000},()=>{},ctl.signal),prompt=clean(raw);
@@ -1930,8 +1947,8 @@ async function makePlate(redo){
     const a=(await metaP)||{cap:"",cast:""};
     if(a.cast)art.cast=a.cast.slice(0,600);
     let p;
-    if(old){p=old;if(PL.urls.has(p.id)){URL.revokeObjectURL(PL.urls.get(p.id));PL.urls.delete(p.id)}p.blob=blob;p.cap=a.cap||p.cap;p.prompt=prompt;p.text=text;p.t=Date.now()}
-    else{p={id:Date.now(),c,after,cap:a.cap,prompt,text,blob,t:Date.now()};(bk.plates||(bk.plates=[])).push(p)}
+    if(old){p=old;if(PL.urls.has(p.id)){URL.revokeObjectURL(PL.urls.get(p.id));PL.urls.delete(p.id)}p.blob=blob;p.cap=a.cap||p.cap;p.prompt=prompt;p.text=text;p.before=before;p.t=Date.now()}
+    else{p={id:Date.now(),c,after,cap:a.cap,prompt,text,before,blob,t:Date.now()};(bk.plates||(bk.plates=[])).push(p)}
     await putBook(bk);
     $("toast").hidden=true;
     if(book===bk&&book.pos.c===c){
@@ -1959,6 +1976,16 @@ flow.addEventListener("click",e=>{
 });
 $("plateBtn").onclick=()=>makePlate();
 $("artStyle").value=prefs.artStyle||"";
+function castShow(){const t=$("artCast");if(t&&document.activeElement!==t)t.value=(book&&book.art&&book.art.bible)||""}
+$("artCast").addEventListener("change",e=>{if(!book)return;const art=book.art||(book.art={});art.bible=e.target.value.trim().slice(0,3000);art.bibleDone=true;putBook(book)});
+$("artRebuild").onclick=async()=>{
+  if(!book){toast("Open a book first.",2500);return}
+  if(!getKey()){toast("Add your Anthropic API key first (under Lookup).",3500);return}
+  const bk=book,b=$("artRebuild");b.disabled=true;b.textContent="Writing\u2026";
+  try{await ensureBible(bk,null,true);if(book===bk)castShow();toast(bk.art&&bk.art.bible?"Character notes updated.":"Claude does not know this book well enough to describe its characters. You can write the notes yourself.",4500)}
+  catch(e){toast(friendly(e)||e.message,5000)}
+  finally{b.disabled=false;b.textContent="Ask Claude to rewrite these notes"}
+};
 $("artStyle").addEventListener("input",e=>{prefs.artStyle=e.target.value.slice(0,120);store.set("marginalia.prefs",prefs)});
 /* ---------- printing: the current layout, page by page, with footnotes ---------- */
 const PR={built:false};
