@@ -52,7 +52,7 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 #flow figure.plate:hover .pbar,#flow figure.plate:focus-within .pbar{opacity:1}
 @media (hover:none){#flow figure.plate .pbar{opacity:1}}
 #flow figure.plate .pbar button{font:inherit;font-family:var(--font-ui);font-size:.7em;padding:.25em .7em;border:1px solid var(--line);border-radius:99px;background:var(--bg);color:var(--fg);cursor:pointer}
-#flow figure.plate .pprompt{display:none;position:absolute;left:4%;right:4%;bottom:3.4em;max-height:55%;overflow:auto;padding:.7em .9em;border-radius:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);box-shadow:0 2px 12px rgba(0,0,0,.3);font-family:var(--font-ui);font-size:.74em;line-height:1.45;text-align:left;user-select:text;-webkit-user-select:text}
+#flow figure.plate .pprompt{white-space:pre-wrap;display:none;position:absolute;left:4%;right:4%;bottom:3.4em;max-height:55%;overflow:auto;padding:.7em .9em;border-radius:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);box-shadow:0 2px 12px rgba(0,0,0,.3);font-family:var(--font-ui);font-size:.74em;line-height:1.45;text-align:left;user-select:text;-webkit-user-select:text}
 #flow figure.plate.showp .pprompt{display:block}
 #printArea .pprompt{display:none!important}
 #flow.noplate figure.plate{display:none}
@@ -340,6 +340,7 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Columns per page</label><div class="seg" id="sCols"><button data-v="1" type="button">1</button><button data-v="2" type="button">2</button><button data-v="3" type="button">3</button></div></div>
   <p class="note" id="layNote"></p>
   <h3 style="margin-top:6px">Illustrations</h3>
+  <div class="ctl"><label for="artModel">Picture model</label><select id="artModel"></select><p class="note" id="artModelNote" style="margin:4px 0 0"></p></div>
   <div class="ctl"><label for="artStyle">Picture style (optional)</label><input id="artStyle" type="text" maxlength="120" placeholder="vintage ink and watercolour book illustration"></div>
   <div class="ctl"><label for="artCast">Characters of this book (Claude's notes, you can edit them)</label><textarea id="artCast" rows="7" maxlength="3000" placeholder="Made the first time you illustrate a page. It describes how each character looks, from Claude's knowledge of the book."></textarea><button class="btn" id="artRebuild" type="button" style="margin-top:6px">Ask Claude to rewrite these notes</button></div>
   <p class="note">In a two-page spread with one column per page, the picture button in the header makes an illustration of the left page and adds it as a full picture page on the right. It needs the web-link relay with image support (see the README).</p>
@@ -1845,6 +1846,15 @@ const DEF_STYLE="vintage ink and watercolour book illustration, soft muted colou
 const ART_SYS="You write the prompt for an AI image generator that paints ONE illustration for a page of a novel. The readers are teenagers. The image generator knows nothing about the book, so everything it needs must be in the prompt as visual words.\nStep 1, silently work out who is on this page. Use the page text, the earlier text, the character notes and your own knowledge of the book, and identify everyone who appears, including those only called he, she, the creature, the stranger and so on.\nStep 2, pick the single most visual moment and describe it: where it is, who is there and what they are doing, the mood and the light. Use at most three characters.\nStep 3, for every character in the picture, write their physical description straight into the prompt (age, build, face, skin, hair, clothing) from the character notes or from what you know of the book. Never use their names. Keep every character exactly as the book describes them: do not make anyone younger, healthier, taller or more handsome than the book does, and give strange or frightening beings their true unusual features in concrete visual words.\nUse clothing and settings that fit the period of the book. Choose a moment and an angle that show fear or violence indirectly (a shadow, a reaction, a distance), but never write words like no, not, nothing, without, gory or violent, and do not mention text, letters or the book. Write 60 to 110 English words and end with the style you are given. Answer with the prompt only.";
 const BIBLE_SYS="You know many books well. The reader is reading the book named below (if the title is missing or looks wrong, work out which book it is from the opening text). List its main characters (up to 8, including creatures and other non-human beings) with their physical appearance exactly as the book describes it: age, build, face, skin, hair and clothing, from your own knowledge of the book. Where the book describes someone as ugly, monstrous, huge, old, disfigured or otherwise not conventionally attractive, say so plainly and concretely; never make anyone more handsome or younger than the book does. Write one line per character in this form: Name (also called: other names or ways the book refers to them): appearance in 20 to 40 words. Then add a last line: Setting: the era, places and usual clothing and surroundings, in 15 to 25 words. Do not mention the plot. If you do not know this book well enough to describe its characters, answer only the word UNKNOWN.";
 const META_SYS="You help caption an illustration of a novel for teenagers. Answer with exactly two lines and nothing else. Line 1: a plain caption of 6 to 14 words, in the language of the page text. Line 2: character notes in English (name: age, hair, clothing) in at most 70 words, keeping the earlier notes and adding any new characters from this page.";
+const IMG_MODELS=[
+  ["flux-schnell","FLUX.1 schnell (fast, default)","Fast and light on the free allowance: roughly 100 pictures a day. Square pictures."],
+  ["flux2-klein-4b","FLUX.2 klein 4B (newer, portrait)","A newer FLUX model that makes portrait pictures that fill the page. Roughly 100 pictures a day on the free allowance."],
+  ["sdxl-lightning","SDXL Lightning (portrait, beta)","A fast Stable Diffusion model with portrait pictures. Cloudflare lists it as beta and does not show its price."],
+  ["phoenix","Leonardo Phoenix 1.0 (portrait, strong prompt following)","Follows long descriptions closely. Heavy on the free allowance: only about 5 pictures a day, then it may need a paid Workers plan."],
+  ["lucid-origin","Leonardo Lucid Origin (portrait, high quality)","The highest quality here, and the heaviest on the allowance: only about 3 pictures a day, then it may need a paid Workers plan."]
+];
+const modelName=k=>(IMG_MODELS.find(m=>m[0]===k)||[k,k])[1].replace(/ \(.*$/,"");
+const curModel=()=>IMG_MODELS.some(m=>m[0]===prefs.artModel)?prefs.artModel:"flux-schnell";
 const plateOK=()=>LP===2&&LC===1;
 function plateUI(){castShow();const b=$("plateBtn");if(b)b.hidden=!(book&&!$("reader").hidden&&plateOK())}
 function plateUrl(p){let u=PL.urls.get(p.id);if(!u){u=URL.createObjectURL(p.blob);PL.urls.set(p.id,u)}return u}
@@ -1854,7 +1864,7 @@ function plateEl(p){
   const cp=document.createElement("figcaption");cp.textContent=(p.cap?p.cap+" · ":"")+"AI-generated illustration";
   const bar=document.createElement("div");bar.className="pbar";
   [["prompt","Show prompt"],["redo","Draw again"],["del","Remove"]].forEach(([a,t])=>{const b=document.createElement("button");b.type="button";b.dataset.act=a;b.textContent=t;bar.append(b)});
-  const pp=document.createElement("div");pp.className="pprompt";pp.textContent=p.prompt||"No prompt was saved for this picture.";
+  const pp=document.createElement("div");pp.className="pprompt";pp.textContent=(p.prompt||"No prompt was saved for this picture.")+(p.model?"\n\nPicture model: "+modelName(p.model):"");
   f.append(im,pp,cp,bar);return f;
 }
 function placePlate(p){          // put the figure after the sentence p.after; split the paragraph there when needed
@@ -1911,12 +1921,13 @@ async function ensureBible(bk,signal,force){      // Claude writes down how the 
     art.bible=t.slice(0,3000);art.bibleDone=true;await putBook(bk);return "ok";
   }catch(e){if(e.name==="AbortError")throw e;console.warn("Illustration: character notes failed",e);return "error: "+(friendly(e)||e.message)}
 }
-async function relayImage(prompt,signal){
+async function relayImage(prompt,signal,model){
   let res;
-  try{res=await fetch(relayAddr()+"/image",{method:"POST",signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt})})}
+  try{res=await fetch(relayAddr()+"/image",{method:"POST",signal,headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,model})})}
   catch(e){if(e.name==="AbortError")throw e;throw new Error("Could not reach the relay. Check the address on the start page.")}
   if(!res.ok){let m="";try{m=(await res.json()).error||""}catch(e){}throw new Error(m||("The relay answered with an error ("+res.status+")."))}
-  const bl=await res.blob();if(!/^image\//.test(bl.type))throw new Error("The relay did not return a picture. Update the Worker code from the README.");return bl;
+  const bl=await res.blob();if(!/^image\//.test(bl.type))throw new Error("The relay did not return a picture. Update the Worker code from the README.");
+  return {blob:bl,used:res.headers.get("X-Image-Model")||""};
 }
 async function makePlate(redo){
   if(PL.busy){if(PL.ctl)PL.ctl.abort();return}
@@ -1925,7 +1936,7 @@ async function makePlate(redo){
   if(!relayAddr()){toast("Illustrations use the web-link relay. Set it up on the start page, then add the Workers AI binding (see the README).",6000);return}
   bubClose(false);
   const bk=book,c=bk.pos.c;
-  let after,text,before="",old=null;
+  let after,text,before="",old=null,staleNote=false;
   if(redo){old=redo;after=old.after;text=old.text;before=old.before||""}
   else{
     const t=leftPageText();
@@ -1953,18 +1964,20 @@ async function makePlate(redo){
     const metaP=streamAnswer({system:META_SYS,user:"Character notes so far: "+(art.cast||"none yet")+"\nPicture prompt: "+prompt+"\n\nPage text:\n"+text,max:500},()=>{},ctl.signal)
       .then(t=>{const ls=String(t||"").replace(/\*\*/g,"").split(/\n+/).map(x=>x.replace(/^\s*(?:caption|character notes|cast|line \d)\s*:\s*/i,"").trim()).filter(Boolean);return {cap:(ls[0]||"").replace(/^["\u201C]|["\u201D]$/g,"").slice(0,160),cast:ls.slice(1).join(" ")}})
       .catch(()=>null);
-    const blob=await relayImage(prompt,ctl.signal);
+    const model=curModel(),{blob,used}=await relayImage(prompt,ctl.signal,model);
+    if(model!=="flux-schnell"&&!used)staleNote=true;
     const a=(await metaP)||{cap:"",cast:""};
     if(a.cast)art.cast=a.cast.slice(0,600);
     let p;
-    if(old){p=old;if(PL.urls.has(p.id)){URL.revokeObjectURL(PL.urls.get(p.id));PL.urls.delete(p.id)}p.blob=blob;p.cap=a.cap||p.cap;p.prompt=prompt;p.text=text;p.before=before;p.t=Date.now()}
-    else{p={id:Date.now(),c,after,cap:a.cap,prompt,text,before,blob,t:Date.now()};(bk.plates||(bk.plates=[])).push(p)}
+    if(old){p=old;if(PL.urls.has(p.id)){URL.revokeObjectURL(PL.urls.get(p.id));PL.urls.delete(p.id)}p.blob=blob;p.cap=a.cap||p.cap;p.prompt=prompt;p.text=text;p.before=before;p.model=model;p.t=Date.now()}
+    else{p={id:Date.now(),c,after,cap:a.cap,prompt,text,before,model,blob,t:Date.now()};(bk.plates||(bk.plates=[])).push(p)}
     await putBook(bk);
     $("toast").hidden=true;
     if(book===bk&&book.pos.c===c){
       const f=flow.querySelector('figure.plate[data-id="'+p.id+'"]');
       if(f){f.replaceWith(plateEl(p))}else{placePlate(p);relayout()}
     }
+    if(staleNote)toast("The relay ignored the model choice and used the default. Replace the Worker code with the newest relay-worker.js (see the README).",8000);
   }catch(err){
     $("toast").hidden=true;
     if(err.name!=="AbortError")toast(err.status?(friendly(err)||err.message):err.message,6000);
@@ -1986,6 +1999,10 @@ flow.addEventListener("click",e=>{
 });
 $("plateBtn").onclick=()=>makePlate();
 $("artStyle").value=prefs.artStyle||"";
+(function(){const sel=$("artModel");IMG_MODELS.forEach(([k,l])=>{const o=document.createElement("option");o.value=k;o.textContent=l;sel.append(o)});
+  const show=()=>{sel.value=curModel();$("artModelNote").textContent=(IMG_MODELS.find(m=>m[0]===curModel())||[])[2]||""};show();
+  sel.addEventListener("change",()=>{prefs.artModel=sel.value;store.set("marginalia.prefs",prefs);show()});
+})();
 function castShow(){const t=$("artCast");if(t&&document.activeElement!==t)t.value=(book&&book.art&&book.art.bible)||""}
 $("artCast").addEventListener("change",e=>{if(!book)return;const art=book.art||(book.art={});art.bible=e.target.value.trim().slice(0,3000);art.bibleDone=true;putBook(book)});
 $("artRebuild").onclick=async()=>{
