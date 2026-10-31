@@ -1891,7 +1891,6 @@ function leftPageText(){      // the sentences that end on the left page of this
 async function ensureBible(bk,signal,force){      // Claude writes down how the characters look, from its knowledge of the book
   const art=bk.art||(bk.art={});
   if(!force&&(art.bible||art.bibleDone))return "have";
-  if(bk.web){art.bibleDone=true;return "web"}
   const bl=bookLine()||"Title: not known (identify the book from the opening text if you can).\n";
   const ch=bk.chapters[bk.pos.c],open=ch&&ch.paras?ch.paras.filter(x=>typeof x==="string").join(" ").slice(0,500):"";
   const user=bl+"Opening of the text the reader has now: "+open;
