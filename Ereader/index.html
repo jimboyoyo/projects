@@ -1481,8 +1481,11 @@ function cachePut(k,v){const m=store.get("marginalia.lk",{});delete m[k];m[k]=v;
 const SA={stop:"",blocks:[]};          // what the last answer looked like, for error messages
 async function streamAnswer(payload,onText,signal){
   SA.stop="";SA.blocks=[];
-  const res=await fetch(API_URL,{method:"POST",signal,headers:{"content-type":"application/json","x-api-key":getKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:prefs.model||"claude-haiku-5-5",max_tokens:payload.max||450,stream:true,system:payload.system,messages:payload.messages||[{role:"user",content:payload.user}]})});
+  const send=think=>fetch(API_URL,{method:"POST",signal,headers:{"content-type":"application/json","x-api-key":getKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:prefs.model||"claude-haiku-5-5",max_tokens:(payload.max||450)+(think?0:3000),stream:true,system:payload.system,messages:payload.messages||[{role:"user",content:payload.user}],...(think?{thinking:{type:"disabled"}}:{})})});
+  // Thinking is switched off: otherwise the model can spend the whole token allowance thinking and send no text at all.
+  let res=await send(true);
+  if(res.status===400){let m="";try{m=((await res.clone().json()).error||{}).message||""}catch(e){}if(/thinking/i.test(m))res=await send(false)}   // a model that does not accept it: ask without, with extra room
   if(!res.ok){
     let msg="";try{const j=await res.json();msg=(j.error&&j.error.message)||""}catch(e){}
     const err=new Error(msg||("HTTP "+res.status));err.status=res.status;throw err;
