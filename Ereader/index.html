@@ -341,7 +341,7 @@ html.reading{overflow:hidden}
   <p class="note" id="layNote"></p>
   <h3 style="margin-top:6px">Illustrations</h3>
   <div class="ctl"><label for="artModel">Picture model</label><select id="artModel"></select><p class="note" id="artModelNote" style="margin:4px 0 0"></p></div>
-  <div class="ctl"><label for="artStyle">Picture style (optional)</label><input id="artStyle" type="text" maxlength="200" placeholder="vintage ink and watercolour book illustration"><button class="btn" id="artSuggest" type="button" style="margin-top:6px">Suggest a style for this book</button></div>
+  <div class="ctl"><label for="artStyle" id="artStyleLbl">Picture style (optional)</label><input id="artStyle" type="text" maxlength="200" placeholder="vintage ink and watercolour book illustration"><button class="btn" id="artSuggest" type="button" style="margin-top:6px">Suggest a style for this book</button></div>
   <div class="ctl"><label for="artCast">Characters of this book (Claude's notes, you can edit them)</label><textarea id="artCast" rows="7" maxlength="3000" placeholder="Made the first time you illustrate a page. It describes how each character looks, from Claude's knowledge of the book."></textarea><button class="btn" id="artRebuild" type="button" style="margin-top:6px">Ask Claude to rewrite these notes</button></div>
   <p class="note">In a two-page spread with one column per page, the picture button in the header makes an illustration of the left page and adds it as a full picture page on the right. It needs the web-link relay with image support (see the README).</p>
   <h3 style="margin-top:6px">Voice</h3>
@@ -632,7 +632,7 @@ function renderCat(){
   if(!list.length){const p=document.createElement("p");p.className="small";p.style.color="var(--muted)";p.textContent="No match in the library. If you typed a Gutenberg ID, press Open to try it.";box.append(p)}
 }
 async function renderShelf(){
-  const bs=(await allBooks()).filter(b=>readFrac(b)>0.002||b.guide||b.web||b.gid==null||(b.notes&&b.notes.length)||(b.marks&&b.marks.length)||(b.words&&b.words.length)).sort((a,b)=>(b.opened||0)-(a.opened||0));
+  const bs=(await allBooks()).filter(b=>readFrac(b)>0.002||b.guide||b.web||b.gid==null||(b.notes&&b.notes.length)||(b.marks&&b.marks.length)||(b.words&&b.words.length)||(b.plates&&b.plates.length)||(b.art&&b.art.style)).sort((a,b)=>(b.opened||0)-(a.opened||0));
   $("contWrap").hidden=!bs.length;const sh=$("shelf");sh.textContent="";
   bs.forEach(b=>{
     const wrap=document.createElement("div");wrap.style.cssText="position:relative;min-width:0";
@@ -1856,7 +1856,7 @@ const IMG_MODELS=[
 const modelName=k=>(IMG_MODELS.find(m=>m[0]===k)||[k,k])[1].replace(/ \(.*$/,"");
 const curModel=()=>IMG_MODELS.some(m=>m[0]===prefs.artModel)?prefs.artModel:"flux-schnell";
 const plateOK=()=>LP===2&&LC===1;
-function plateUI(){castShow();const b=$("plateBtn");if(b)b.hidden=!(book&&!$("reader").hidden&&plateOK())}
+function plateUI(){castShow();styleShow();const b=$("plateBtn");if(b)b.hidden=!(book&&!$("reader").hidden&&plateOK())}
 function plateUrl(p){let u=PL.urls.get(p.id);if(!u){u=URL.createObjectURL(p.blob);PL.urls.set(p.id,u)}return u}
 function plateEl(p){
   const f=document.createElement("figure");f.className="plate";f.dataset.id=p.id;
@@ -1946,7 +1946,7 @@ async function makePlate(redo){
   PL.busy=true;const ctl=PL.ctl=new AbortController();$("plateBtn").classList.add("busy");
   toast("Painting an illustration… this takes about 20 seconds. Click the picture button again to cancel.",90000);
   try{
-    const art=bk.art||(bk.art={}),style=(prefs.artStyle||"").trim()||DEF_STYLE;
+    const art=bk.art||(bk.art={}),style=styleOf(bk)||DEF_STYLE;
     const ch=bk.chapters[c];
     await ensureBible(bk,ctl.signal);
     const user=bookLine()+"Chapter: "+(ch?ch.title:"")+"\nStyle: "+style+"\nCharacters of this book:\n"+(art.bible||"(none known)")+"\nExtra notes on characters met so far: "+(art.cast||"none yet")+(before?"\n\nEarlier text, only to help you see who is who:\n"+before:"")+(old&&old.prompt?"\nThe previous picture for this page used: "+old.prompt+"\nChoose a different moment or composition this time.":"")+"\n\nPage text:\n"+text;
@@ -1998,7 +1998,13 @@ flow.addEventListener("click",e=>{
   PL.armed=p.id;b.textContent="Really remove?";setTimeout(()=>{if(PL.armed===p.id){PL.armed=null;b.textContent="Remove"}},3000);
 });
 $("plateBtn").onclick=()=>makePlate();
-$("artStyle").value=prefs.artStyle||"";
+const styleOf=bk=>((bk&&bk.art&&bk.art.style)||prefs.artStyle||"").trim();      // the book's own style, else the old shared one
+function styleShow(){
+  const t=$("artStyle");if(!t)return;
+  $("artStyleLbl").textContent=book?"Picture style for this book":"Picture style (used for books that have none of their own)";
+  if(document.activeElement!==t)t.value=styleOf(book);
+}
+styleShow();
 (function(){const sel=$("artModel");IMG_MODELS.forEach(([k,l])=>{const o=document.createElement("option");o.value=k;o.textContent=l;sel.append(o)});
   const show=()=>{sel.value=curModel();$("artModelNote").textContent=(IMG_MODELS.find(m=>m[0]===curModel())||[])[2]||""};show();
   sel.addEventListener("change",()=>{prefs.artModel=sel.value;store.set("marginalia.prefs",prefs);show()});
@@ -2016,7 +2022,12 @@ $("artRebuild").onclick=async()=>{
   catch(e){toast(friendly(e)||e.message,5000)}
   finally{b.disabled=false;b.textContent="Ask Claude to rewrite these notes"}
 };
-$("artStyle").addEventListener("input",e=>{prefs.artStyle=e.target.value.slice(0,200);store.set("marginalia.prefs",prefs)});
+$("artStyle").addEventListener("input",e=>{
+  const v=e.target.value.slice(0,200);
+  if(book){(book.art||(book.art={})).style=v.trim()}else{prefs.artStyle=v;store.set("marginalia.prefs",prefs)}
+});
+$("artStyle").addEventListener("change",()=>{if(book)putBook(book)});
+$("setBtn").addEventListener("click",()=>{castShow();styleShow()});
 const STYLE_SYS="You choose an illustration style for a book. Answer with one line only: a style description of 12 to 25 English words that an AI image generator can use. Name the medium and technique (for example engraving, watercolour, oil painting, ink wash), the colour palette, and the mood, so that it fits the book's era, setting and tone. Use positive wording only and never write no, not or without. Do not name any artist and do not name the book.";
 $("artSuggest").onclick=async()=>{
   if(!book){toast("Open a book first, so Claude can fit the style to it.",3000);return}
@@ -2028,8 +2039,9 @@ $("artSuggest").onclick=async()=>{
     let t=String(await streamAnswer({system:STYLE_SYS,user,max:400},()=>{},null)||"").replace(/\*\*|`/g,"").split(/\n+/).map(x=>x.trim()).filter(Boolean)[0]||"";
     t=t.replace(/^(?:style|picture style)\s*:\s*/i,"").replace(/^["\u201C]|["\u201D.]+$/g,"").trim().slice(0,200);
     if(t.length<8)throw new Error("Claude did not suggest a style ("+(SA.stop||"unknown")+"). Try again.");
-    $("artStyle").value=t;prefs.artStyle=t;store.set("marginalia.prefs",prefs);
-    toast("Style suggested. You can edit it in the box.",3000);
+    (bk.art||(bk.art={})).style=t;await putBook(bk);
+    if(book===bk){$("artStyle").value=t}
+    toast("Style suggested for this book. You can edit it in the box.",3000);
   }catch(e){toast(e.status?(friendly(e)||e.message):e.message,6000)}
   finally{b.disabled=false;b.textContent="Suggest a style for this book"}
 };
