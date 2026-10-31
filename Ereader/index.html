@@ -1840,7 +1840,7 @@ $("imgBox").addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault
 const PL={busy:false,ctl:null,urls:new Map(),armed:null};
 const DEF_STYLE="vintage ink and watercolour book illustration, soft muted colours";
 const ART_SYS="You write the prompt for an AI image generator that paints ONE illustration for a page of a novel. The readers are teenagers. The image generator knows nothing about the book, so everything it needs must be in the prompt as visual words.\nStep 1, silently work out who is on this page. Use the page text, the earlier text, the character notes and your own knowledge of the book, and identify everyone who appears, including those only called he, she, the creature, the stranger and so on.\nStep 2, pick the single most visual moment and describe it: where it is, who is there and what they are doing, the mood and the light. Use at most three characters.\nStep 3, for every character in the picture, write their physical description straight into the prompt (age, build, face, skin, hair, clothing) from the character notes or from what you know of the book. Never use their names. Keep every character exactly as the book describes them: do not make anyone younger, healthier, taller or more handsome than the book does, and give strange or frightening beings their true unusual features in concrete visual words.\nUse clothing and settings that fit the period of the book. Choose a moment and an angle that show fear or violence indirectly (a shadow, a reaction, a distance), but never write words like no, not, nothing, without, gory or violent, and do not mention text, letters or the book. Write 60 to 110 English words and end with the style you are given. Answer with the prompt only.";
-const BIBLE_SYS="You know many books well. The reader is reading the book named below. List its main characters (up to 8, including creatures and other non-human beings) with their physical appearance exactly as the book describes it: age, build, face, skin, hair and clothing, from your own knowledge of the book. Where the book describes someone as ugly, monstrous, huge, old, disfigured or otherwise not conventionally attractive, say so plainly and concretely; never make anyone more handsome or younger than the book does. Write one line per character in this form: Name (also called: other names or ways the book refers to them): appearance in 20 to 40 words. Then add a last line: Setting: the era, places and usual clothing and surroundings, in 15 to 25 words. Do not mention the plot. If you do not know this book well enough to describe its characters, answer only the word UNKNOWN.";
+const BIBLE_SYS="You know many books well. The reader is reading the book named below (if the title is missing or looks wrong, work out which book it is from the opening text). List its main characters (up to 8, including creatures and other non-human beings) with their physical appearance exactly as the book describes it: age, build, face, skin, hair and clothing, from your own knowledge of the book. Where the book describes someone as ugly, monstrous, huge, old, disfigured or otherwise not conventionally attractive, say so plainly and concretely; never make anyone more handsome or younger than the book does. Write one line per character in this form: Name (also called: other names or ways the book refers to them): appearance in 20 to 40 words. Then add a last line: Setting: the era, places and usual clothing and surroundings, in 15 to 25 words. Do not mention the plot. If you do not know this book well enough to describe its characters, answer only the word UNKNOWN.";
 const META_SYS="You help caption an illustration of a novel for teenagers. Answer with exactly two lines and nothing else. Line 1: a plain caption of 6 to 14 words, in the language of the page text. Line 2: character notes in English (name: age, hair, clothing) in at most 70 words, keeping the earlier notes and adding any new characters from this page.";
 const plateOK=()=>LP===2&&LC===1;
 function plateUI(){castShow();const b=$("plateBtn");if(b)b.hidden=!(book&&!$("reader").hidden&&plateOK())}
@@ -1890,16 +1890,24 @@ function leftPageText(){      // the sentences that end on the left page of this
 }
 async function ensureBible(bk,signal,force){      // Claude writes down how the characters look, from its knowledge of the book
   const art=bk.art||(bk.art={});
-  if(!force&&(art.bible||art.bibleDone))return;
-  if(bk.web){art.bibleDone=true;return}
-  const bl=bookLine();if(!bl)return;
+  if(!force&&(art.bible||art.bibleDone))return "have";
+  if(bk.web){art.bibleDone=true;return "web"}
+  const bl=bookLine()||"Title: not known (identify the book from the opening text if you can).\n";
   const ch=bk.chapters[bk.pos.c],open=ch&&ch.paras?ch.paras.filter(x=>typeof x==="string").join(" ").slice(0,500):"";
+  const user=bl+"Opening of the text the reader has now: "+open;
+  const plain="List up to 8 main characters of the book below, one per line as: Name (also called: other names or ways the book refers to them): how they look in the book, 20 to 40 words (age, build, face, skin, hair, clothing). Where the book describes someone as ugly, monstrous, huge, old or disfigured, say so plainly; never make anyone more handsome than the book does. End with one line starting Setting: with the era and places. Do not mention the plot. If you do not know the book, answer only UNKNOWN.\n\n"+user;
   try{
-    const t=String(await streamAnswer({system:BIBLE_SYS,user:bl+"Opening of the text the reader has now: "+open,max:1100},()=>{},signal)||"").replace(/\*\*/g,"").trim();
-    if(/^UNKNOWN/i.test(t)||t.length<20){art.bible="";art.bibleDone=true}
-    else{art.bible=t.slice(0,3000);art.bibleDone=true}
-    await putBook(bk);
-  }catch(e){if(e.name==="AbortError")throw e;console.warn("Illustration: character notes failed",e)}
+    let t="",diag="";
+    for(const req of [{system:BIBLE_SYS,user},{system:"You are a careful literature assistant.",user:plain}]){
+      t=String(await streamAnswer({...req,max:1200},()=>{},signal)||"").replace(/\*\*/g,"").trim();
+      diag=(SA.stop||"unknown")+"; parts: "+(SA.blocks.join(", ")||"none");
+      if(t.length>=20||/^UNKNOWN/i.test(t))break;
+      console.warn("Illustration: empty character notes",JSON.stringify(t),diag);
+    }
+    if(/^UNKNOWN/i.test(t)){art.bible="";art.bibleDone=true;await putBook(bk);return "unknown"}
+    if(t.length<20)return "empty ("+diag+")";
+    art.bible=t.slice(0,3000);art.bibleDone=true;await putBook(bk);return "ok";
+  }catch(e){if(e.name==="AbortError")throw e;console.warn("Illustration: character notes failed",e);return "error: "+(friendly(e)||e.message)}
 }
 async function relayImage(prompt,signal){
   let res;
@@ -1982,7 +1990,10 @@ $("artRebuild").onclick=async()=>{
   if(!book){toast("Open a book first.",2500);return}
   if(!getKey()){toast("Add your Anthropic API key first (under Lookup).",3500);return}
   const bk=book,b=$("artRebuild");b.disabled=true;b.textContent="Writing\u2026";
-  try{await ensureBible(bk,null,true);if(book===bk)castShow();toast(bk.art&&bk.art.bible?"Character notes updated.":"Claude does not know this book well enough to describe its characters. You can write the notes yourself.",4500)}
+  try{
+    const r=await ensureBible(bk,null,true);if(book===bk)castShow();
+    toast(r==="ok"?"Character notes updated.":r==="unknown"?"Claude says it does not know this book well enough (the title saved for it is \""+(bk.title||"")+"\"). You can write the notes yourself.":"The character notes could not be written: "+r+".",r==="ok"?3000:8000);
+  }
   catch(e){toast(friendly(e)||e.message,5000)}
   finally{b.disabled=false;b.textContent="Ask Claude to rewrite these notes"}
 };
