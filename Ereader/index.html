@@ -178,6 +178,8 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .shelf,.cat{display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:12px}
 .book{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:4px;text-align:left;min-width:0;position:relative;align-content:start;width:100%}
 .book:hover{border-color:var(--accent)}
+.book .cover{display:block;margin:-14px -16px 8px;aspect-ratio:3/2;overflow:hidden;border-radius:9px 9px 0 0;background:var(--line)}
+.book .cover img{display:block;width:100%;height:100%;object-fit:cover}
 .book .t{font-family:var(--font-display);font-weight:700;font-size:1.05rem;line-height:1.25;text-wrap:balance;overflow-wrap:anywhere}
 .book .a{color:var(--muted)}
 .bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
@@ -631,14 +633,20 @@ function renderCat(){
   list.forEach(b=>box.append(card(b.title,b.author,"#"+b.id+" · "+b.words.toLocaleString("en")+" words · "+fmtH(b.words),null,el=>openById(b.id,el))));
   if(!list.length){const p=document.createElement("p");p.className="small";p.style.color="var(--muted)";p.textContent="No match in the library. If you typed a Gutenberg ID, press Open to try it.";box.append(p)}
 }
+const SH={urls:[]};
 async function renderShelf(){
+  SH.urls.forEach(u=>URL.revokeObjectURL(u));SH.urls=[];
   const bs=(await allBooks()).filter(b=>readFrac(b)>0.002||b.guide||b.web||b.gid==null||(b.notes&&b.notes.length)||(b.marks&&b.marks.length)||(b.words&&b.words.length)||(b.plates&&b.plates.length)||(b.art&&b.art.style)).sort((a,b)=>(b.opened||0)-(a.opened||0));
   $("contWrap").hidden=!bs.length;const sh=$("shelf");sh.textContent="";
   bs.forEach(b=>{
     const wrap=document.createElement("div");wrap.style.cssText="position:relative;min-width:0";
-    wrap.append(card(b.title,b.author,(readFrac(b)>0.002?Math.round(readFrac(b)*100)+"% read · "+fmtH(b.total*(1-readFrac(b)))+" left":(b.web?"Web page · ":"")+fmtH(b.total)+" to read"),readFrac(b),()=>openBook(b)));
+    const cd=card(b.title,b.author,(readFrac(b)>0.002?Math.round(readFrac(b)*100)+"% read · "+fmtH(b.total*(1-readFrac(b)))+" left":(b.web?"Web page · ":"")+fmtH(b.total)+" to read"),readFrac(b),()=>openBook(b));
+    // the newest illustration in the book is its cover
+    const lp=(b.plates||[]).filter(p=>p.blob).sort((p,q)=>(q.t||0)-(p.t||0))[0];
+    if(lp){try{const u=URL.createObjectURL(lp.blob);SH.urls.push(u);const sp=document.createElement("span"),im=document.createElement("img");sp.className="cover";im.src=u;im.alt="";im.loading="lazy";sp.append(im);cd.prepend(sp)}catch(e){}}
+    wrap.append(cd);
     const x=document.createElement("button");x.type="button";x.textContent="Remove";x.setAttribute("aria-label","Remove "+b.title);
-    x.style.cssText="position:absolute;top:8px;right:8px;background:none;border:0;color:var(--muted);padding:4px 8px;border-radius:4px;font-size:.8rem";
+    x.style.cssText="position:absolute;top:8px;right:8px;background:"+(lp?"var(--surface)":"none")+";border:0;color:var(--muted);padding:4px 8px;border-radius:4px;font-size:.8rem";
     x.onclick=async()=>{if(x.dataset.sure){await delBook(b.id);renderShelf()}else{x.dataset.sure=1;x.textContent="Remove?";setTimeout(()=>{x.dataset.sure="";x.textContent="Remove"},2500)}};
     wrap.append(x);sh.append(wrap);
   });
@@ -823,7 +831,7 @@ function updateUI(){
   const mins=Math.max(0,Math.round(book.total*(1-done)/230));
   $("left").textContent=(mins>=60?Math.floor(mins/60)+" h "+(mins%60)+" min":mins+" min")+" left";
   $("prev").disabled=c===0&&page===0;$("next").disabled=c===book.chapters.length-1&&page===pages-1;
-  clearTimeout(saveT);saveT=setTimeout(()=>putBook(book),500);
+  clearTimeout(saveT);{const bk=book;saveT=setTimeout(()=>{if(bk)putBook(bk)},500)}
 }
 $("next").onclick=next;$("prev").onclick=prev;
 let turnT=null;
