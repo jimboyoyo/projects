@@ -341,7 +341,7 @@ html.reading{overflow:hidden}
   <p class="note" id="layNote"></p>
   <h3 style="margin-top:6px">Illustrations</h3>
   <div class="ctl"><label for="artModel">Picture model</label><select id="artModel"></select><p class="note" id="artModelNote" style="margin:4px 0 0"></p></div>
-  <div class="ctl"><label for="artStyle">Picture style (optional)</label><input id="artStyle" type="text" maxlength="120" placeholder="vintage ink and watercolour book illustration"></div>
+  <div class="ctl"><label for="artStyle">Picture style (optional)</label><input id="artStyle" type="text" maxlength="200" placeholder="vintage ink and watercolour book illustration"><button class="btn" id="artSuggest" type="button" style="margin-top:6px">Suggest a style for this book</button></div>
   <div class="ctl"><label for="artCast">Characters of this book (Claude's notes, you can edit them)</label><textarea id="artCast" rows="7" maxlength="3000" placeholder="Made the first time you illustrate a page. It describes how each character looks, from Claude's knowledge of the book."></textarea><button class="btn" id="artRebuild" type="button" style="margin-top:6px">Ask Claude to rewrite these notes</button></div>
   <p class="note">In a two-page spread with one column per page, the picture button in the header makes an illustration of the left page and adds it as a full picture page on the right. It needs the web-link relay with image support (see the README).</p>
   <h3 style="margin-top:6px">Voice</h3>
@@ -2016,7 +2016,23 @@ $("artRebuild").onclick=async()=>{
   catch(e){toast(friendly(e)||e.message,5000)}
   finally{b.disabled=false;b.textContent="Ask Claude to rewrite these notes"}
 };
-$("artStyle").addEventListener("input",e=>{prefs.artStyle=e.target.value.slice(0,120);store.set("marginalia.prefs",prefs)});
+$("artStyle").addEventListener("input",e=>{prefs.artStyle=e.target.value.slice(0,200);store.set("marginalia.prefs",prefs)});
+const STYLE_SYS="You choose an illustration style for a book. Answer with one line only: a style description of 12 to 25 English words that an AI image generator can use. Name the medium and technique (for example engraving, watercolour, oil painting, ink wash), the colour palette, and the mood, so that it fits the book's era, setting and tone. Use positive wording only and never write no, not or without. Do not name any artist and do not name the book.";
+$("artSuggest").onclick=async()=>{
+  if(!book){toast("Open a book first, so Claude can fit the style to it.",3000);return}
+  if(!getKey()){toast("Add your Anthropic API key first (under Lookup).",3500);return}
+  const bk=book,b=$("artSuggest");b.disabled=true;b.textContent="Thinking of a style\u2026";
+  try{
+    const ch=bk.chapters[bk.pos.c],open=ch&&ch.paras?ch.paras.filter(x=>typeof x==="string").join(" ").slice(0,500):"";
+    const user=(bookLine()||"Title: not known.\n")+(bk.art&&bk.art.bible?"Characters and setting:\n"+bk.art.bible.slice(0,1200)+"\n\n":"")+"Opening of the text the reader has now: "+open;
+    let t=String(await streamAnswer({system:STYLE_SYS,user,max:400},()=>{},null)||"").replace(/\*\*|`/g,"").split(/\n+/).map(x=>x.trim()).filter(Boolean)[0]||"";
+    t=t.replace(/^(?:style|picture style)\s*:\s*/i,"").replace(/^["\u201C]|["\u201D.]+$/g,"").trim().slice(0,200);
+    if(t.length<8)throw new Error("Claude did not suggest a style ("+(SA.stop||"unknown")+"). Try again.");
+    $("artStyle").value=t;prefs.artStyle=t;store.set("marginalia.prefs",prefs);
+    toast("Style suggested. You can edit it in the box.",3000);
+  }catch(e){toast(e.status?(friendly(e)||e.message):e.message,6000)}
+  finally{b.disabled=false;b.textContent="Suggest a style for this book"}
+};
 /* ---------- printing: the current layout, page by page, with footnotes ---------- */
 const PR={built:false};
 function teardownPrint(){const a=document.getElementById("printArea");if(a)a.remove();const st=document.getElementById("printPage");if(st)st.remove();PR.built=false}
