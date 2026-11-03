@@ -53,7 +53,9 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 @media (hover:none){#flow figure.plate .pbar{opacity:1}}
 #flow figure.plate .pbar button{font:inherit;font-family:var(--font-ui);font-size:.7em;padding:.25em .7em;border:1px solid var(--line);border-radius:99px;background:var(--bg);color:var(--fg);cursor:pointer}
 #flow figure.plate .pprompt{white-space:pre-wrap;display:none;position:absolute;left:4%;right:4%;bottom:3.4em;max-height:55%;overflow:auto;padding:.7em .9em;border-radius:6px;background:var(--bg);color:var(--fg);border:1px solid var(--line);box-shadow:0 2px 12px rgba(0,0,0,.3);font-family:var(--font-ui);font-size:.74em;line-height:1.45;text-align:left;user-select:text;-webkit-user-select:text}
-#flow figure.plate.showp .pprompt{display:block}
+#flow figure.plate.showp .pprompt{display:block;padding-right:2.4em}
+#flow figure.plate .pprompt .pclose{position:absolute;top:.25em;right:.35em;width:1.9em;height:1.9em;border:0;border-radius:50%;background:none;color:var(--fg);opacity:.75;font-size:1.6em;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#flow figure.plate .pprompt .pclose:hover,#flow figure.plate .pprompt .pclose:focus-visible{background:var(--line);color:var(--fg)}
 #printArea .pprompt{display:none!important}
 #flow.noplate figure.plate{display:none}
 #printArea .pbar{display:none!important}
@@ -874,7 +876,7 @@ addEventListener("keydown",e=>{
   if(e.key==="]")showChapter(book.pos.c+1,0);
   else if(e.key==="[")showChapter(book.pos.c-1,0);
   else if(e.key==="b"||e.key==="B")togglePageBookmark();
-  else if(e.key==="Escape"){if(bubShown())bubClose(true);else if(LF.on&&LF.locked)lfUnlock();else closeAll()}
+  else if(e.key==="Escape"){if(bubShown())bubClose(true);else if(plateCloseOpen()){}else if(LF.on&&LF.locked)lfUnlock();else closeAll()}
 });
 function relayout(){
   if(!book||$("reader").hidden)return;
@@ -1865,6 +1867,10 @@ const IMG_MODELS=[
 const modelName=k=>(IMG_MODELS.find(m=>m[0]===k)||[k,k])[1].replace(/ \(.*$/,"");
 const curModel=()=>IMG_MODELS.some(m=>m[0]===prefs.artModel)?prefs.artModel:"flux-schnell";
 const plateOK=()=>LP===2&&LC===1;
+function plateCloseOpen(){     // hides any picture prompt that is showing; true if one was
+  const f=flow.querySelector("figure.plate.showp");if(!f)return false;
+  f.classList.remove("showp");const b=f.querySelector('button[data-act=prompt]');if(b)b.textContent="Show prompt";return true;
+}
 function plateUI(){castShow();styleShow();const b=$("plateBtn");if(b)b.hidden=!(book&&!$("reader").hidden&&plateOK())}
 function plateUrl(p){let u=PL.urls.get(p.id);if(!u){u=URL.createObjectURL(p.blob);PL.urls.set(p.id,u)}return u}
 function plateEl(p){
@@ -1873,7 +1879,9 @@ function plateEl(p){
   const cp=document.createElement("figcaption");cp.textContent=(p.cap?p.cap+" · ":"")+"AI-generated illustration";
   const bar=document.createElement("div");bar.className="pbar";
   [["prompt","Show prompt"],["redo","Draw again"],["del","Remove"]].forEach(([a,t])=>{const b=document.createElement("button");b.type="button";b.dataset.act=a;b.textContent=t;bar.append(b)});
-  const pp=document.createElement("div");pp.className="pprompt";pp.textContent=(p.moment?"Scene chosen: "+p.moment+"\n\n":"")+(p.prompt||"No prompt was saved for this picture.")+(p.model?"\n\nPicture model: "+modelName(p.model):"")+(p.shared?"\n\nThis picture was made earlier and is shared with your class. Draw again makes a picture of your own.":"");
+  const pp=document.createElement("div");pp.className="pprompt";const ptx=document.createElement("div");ptx.textContent=(p.moment?"Scene chosen: "+p.moment+"\n\n":"")+(p.prompt||"No prompt was saved for this picture.")+(p.model?"\n\nPicture model: "+modelName(p.model):"")+(p.shared?"\n\nThis picture was made earlier and is shared with your class. Draw again makes a picture of your own.":"");
+  const px=document.createElement("button");px.type="button";px.className="pclose";px.dataset.act="closeprompt";px.setAttribute("aria-label","Close the prompt");px.title="Close";px.textContent="\u00D7";
+  pp.append(ptx,px);
   f.append(im,pp,cp,bar);return f;
 }
 function placePlate(p){          // put the figure after the sentence p.after; split the paragraph there when needed
@@ -2037,6 +2045,7 @@ flow.addEventListener("click",e=>{
   const b=e.target.closest&&e.target.closest("figure.plate button");if(!b)return;
   e.stopPropagation();
   const p=(book.plates||[]).find(x=>String(x.id)===b.closest("figure").dataset.id);if(!p)return;
+  if(b.dataset.act==="closeprompt"){plateCloseOpen();return}
   if(b.dataset.act==="prompt"){const f=b.closest("figure"),on=f.classList.toggle("showp");b.textContent=on?"Hide prompt":"Show prompt";return}
   if(b.dataset.act==="redo"){makePlate(p);return}
   if(PL.armed===p.id){PL.armed=null;removePlate(p);return}
