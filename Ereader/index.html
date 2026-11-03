@@ -344,6 +344,7 @@ html.reading{overflow:hidden}
   <h3 style="margin-top:6px">Illustrations</h3>
   <div class="ctl"><label for="artModel">Picture model</label><select id="artModel"></select><p class="note" id="artModelNote" style="margin:4px 0 0"></p></div>
   <div class="ctl"><label for="artStyle" id="artStyleLbl">Picture style (optional)</label><input id="artStyle" type="text" maxlength="200" placeholder="vintage ink and watercolour book illustration"><button class="btn" id="artSuggest" type="button" style="margin-top:6px">Suggest a style for this book</button></div>
+  <div class="ctl"><label for="teacherKey">Teacher key (optional)</label><input id="teacherKey" type="password" autocomplete="off" spellcheck="false" maxlength="100" placeholder="Only for teachers"><p class="note" style="margin:4px 0 0">Pictures are shared with everyone who reads the same book through your relay. With the teacher key, Draw again replaces the shared picture.</p></div>
   <div class="ctl"><label for="artCast">Characters of this book (Claude's notes, you can edit them)</label><textarea id="artCast" rows="7" maxlength="3000" placeholder="Made the first time you illustrate a page. It describes how each character looks, from Claude's knowledge of the book."></textarea><button class="btn" id="artRebuild" type="button" style="margin-top:6px">Ask Claude to rewrite these notes</button></div>
   <p class="note">In a two-page spread with one column per page, the picture button in the header makes an illustration of the left page and adds it as a full picture page on the right. It needs the web-link relay with image support (see the README).</p>
   <h3 style="margin-top:6px">Voice</h3>
@@ -1872,7 +1873,7 @@ function plateEl(p){
   const cp=document.createElement("figcaption");cp.textContent=(p.cap?p.cap+" · ":"")+"AI-generated illustration";
   const bar=document.createElement("div");bar.className="pbar";
   [["prompt","Show prompt"],["redo","Draw again"],["del","Remove"]].forEach(([a,t])=>{const b=document.createElement("button");b.type="button";b.dataset.act=a;b.textContent=t;bar.append(b)});
-  const pp=document.createElement("div");pp.className="pprompt";pp.textContent=(p.prompt||"No prompt was saved for this picture.")+(p.model?"\n\nPicture model: "+modelName(p.model):"");
+  const pp=document.createElement("div");pp.className="pprompt";pp.textContent=(p.prompt||"No prompt was saved for this picture.")+(p.model?"\n\nPicture model: "+modelName(p.model):"")+(p.shared?"\n\nThis picture was made earlier and is shared with your class. Draw again makes a picture of your own.":"");
   f.append(im,pp,cp,bar);return f;
 }
 function placePlate(p){          // put the figure after the sentence p.after; split the paragraph there when needed
@@ -1937,10 +1938,32 @@ async function relayImage(prompt,signal,model){
   const bl=await res.blob();if(!/^image\//.test(bl.type))throw new Error("The relay did not return a picture. Update the Worker code from the README.");
   return {blob:bl,used:res.headers.get("X-Image-Model")||""};
 }
+/* shared pictures: the relay keeps the first picture made for each spot in a book, and classmates reuse it */
+async function hex(str){
+  try{const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(str));return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,"0")).join("").slice(0,32)}
+  catch(e){let h=5381;for(const ch of str)h=((h<<5)+h+ch.charCodeAt(0))>>>0;return h.toString(16).padStart(8,"0")}
+}
+const bookKey=b=>b.gid!=null?"g"+b.gid:(b.web&&b.source?"w"+b.source:"t|"+(b.title||"")+"|"+(b.author||"")+"|"+b.total);
+const picKey=async(b,c,after)=>"v1:"+await hex(bookKey(b))+":"+c+":"+Math.floor(after/12);   // about twelve sentences share one picture
+async function sharedGet(key,signal){
+  try{
+    const res=await fetch(relayAddr()+"/pic?key="+encodeURIComponent(key),{signal});
+    if(!res.ok)return null;
+    const j=await res.json();if(!j||!j.image||!/^image\//.test(j.type||""))return null;
+    const bin=atob(j.image),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+    return {...j,blob:new Blob([u],{type:j.type})};
+  }catch(e){if(e.name==="AbortError")throw e;return null}
+}
+async function sharedPut(key,p){
+  try{
+    const data=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(",")[1]||"");r.onerror=no;r.readAsDataURL(p.blob)});
+    const h={"Content-Type":"application/json"};if((prefs.teacherKey||"").trim())h["X-Teacher-Key"]=prefs.teacherKey.trim();
+    await fetch(relayAddr()+"/pic",{method:"POST",headers:h,body:JSON.stringify({key,cap:p.cap||"",prompt:p.prompt||"",model:p.model||"",style:styleOf(book)||"",image:data})});
+  }catch(e){console.warn("Shared picture not stored",e)}
+}
 async function makePlate(redo){
   if(PL.busy){if(PL.ctl)PL.ctl.abort();return}
   if(!book||!plateOK())return;
-  if(!getKey()){toast("Add your Anthropic API key first (Aa panel, under Lookup).",4000);return}
   if(!relayAddr()){toast("Illustrations use the web-link relay. Set it up on the start page, then add the Workers AI binding (see the README).",6000);return}
   bubClose(false);
   const bk=book,c=bk.pos.c;
@@ -1952,8 +1975,20 @@ async function makePlate(redo){
     after=t.after;text=t.text;before=t.before||"";old=(bk.plates||[]).find(p=>p.c===c&&p.after===after)||null;
   }
   PL.busy=true;const ctl=PL.ctl=new AbortController();$("plateBtn").classList.add("busy");
-  toast("Painting an illustration… this takes about 20 seconds. Click the picture button again to cancel.",90000);
+  toast("Looking for a picture\u2026 click the picture button again to cancel.",90000);
   try{
+    const skey=await picKey(bk,c,after);
+    if(!old){
+      const hit=await sharedGet(skey,ctl.signal);
+      if(hit){
+        const p={id:Date.now(),c,after,cap:hit.cap||"",prompt:hit.prompt||"",text,before,model:hit.model||"",shared:true,blob:hit.blob,t:Date.now()};
+        (bk.plates||(bk.plates=[])).push(p);await putBook(bk);$("toast").hidden=true;
+        if(book===bk&&book.pos.c===c){placePlate(p);relayout()}
+        toast("This picture was made earlier and is shared with your class.",4000);return;
+      }
+    }
+    if(!getKey()){throw new Error("Add your Anthropic API key first (Aa panel, under Lookup).")}
+    toast("Painting an illustration\u2026 this takes about 20 seconds. Click the picture button again to cancel.",90000);
     const art=bk.art||(bk.art={}),style=styleOf(bk)||DEF_STYLE;
     const ch=bk.chapters[c];
     await ensureBible(bk,ctl.signal);
@@ -1979,7 +2014,8 @@ async function makePlate(redo){
     let p;
     if(old){p=old;if(PL.urls.has(p.id)){URL.revokeObjectURL(PL.urls.get(p.id));PL.urls.delete(p.id)}p.blob=blob;p.cap=a.cap||p.cap;p.prompt=prompt;p.text=text;p.before=before;p.model=model;p.t=Date.now()}
     else{p={id:Date.now(),c,after,cap:a.cap,prompt,text,before,model,blob,t:Date.now()};(bk.plates||(bk.plates=[])).push(p)}
-    await putBook(bk);
+    p.shared=false;await putBook(bk);
+    sharedPut(skey,p);
     $("toast").hidden=true;
     if(book===bk&&book.pos.c===c){
       const f=flow.querySelector('figure.plate[data-id="'+p.id+'"]');
@@ -2035,6 +2071,9 @@ $("artStyle").addEventListener("input",e=>{
   if(book){(book.art||(book.art={})).style=v.trim()}else{prefs.artStyle=v;store.set("marginalia.prefs",prefs)}
 });
 $("artStyle").addEventListener("change",()=>{if(book)putBook(book)});
+$("teacherKey").value=prefs.teacherKey||"";
+$("teacherKey").addEventListener("input",e=>{prefs.teacherKey=e.target.value.slice(0,100);store.set("marginalia.prefs",prefs)});
+$("teacherKey").addEventListener("keydown",e=>e.stopPropagation());
 $("setBtn").addEventListener("click",()=>{castShow();styleShow()});
 const STYLE_SYS="You choose an illustration style for a book. Answer with one line only: a style description of 12 to 25 English words that an AI image generator can use. Name the medium and technique (for example engraving, watercolour, oil painting, ink wash), the colour palette, and the mood, so that it fits the book's era, setting and tone. Use positive wording only and never write no, not or without. Do not name any artist and do not name the book.";
 $("artSuggest").onclick=async()=>{
