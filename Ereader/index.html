@@ -138,6 +138,15 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 .notes .nq{font-style:italic;font-size:.85rem;padding-right:22px;overflow-wrap:anywhere}
 .notes .na{font-size:.8rem;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .notes button.go{all:unset;cursor:pointer;display:grid;gap:4px}
+.pics li{padding:8px;gap:6px}
+.pics .pthumb{display:block;width:100%;padding:0;border:0;background:var(--line);border-radius:6px;overflow:hidden;cursor:pointer}
+.pics .pthumb img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover}
+.pics .pcap{font-size:.85rem;overflow-wrap:anywhere}
+.pics .pmeta{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.75rem;color:var(--muted)}
+.pics .pmeta button{font:inherit;font-size:.75rem;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:99px;padding:2px 10px;cursor:pointer}
+.pics details{font-size:.78rem;color:var(--muted)}
+.pics summary{cursor:pointer}
+.pics .pp{white-space:pre-wrap;margin-top:4px;user-select:text;-webkit-user-select:text;overflow-wrap:anywhere}
 .notes button.del{position:absolute;top:4px;right:6px;background:none;border:0;cursor:pointer;color:var(--muted);font-size:1rem}
 .sheet input.key{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 8px}
 
@@ -327,7 +336,7 @@ html.reading{overflow:hidden}
 </main>
 
 <div class="scrim" id="scrim" hidden></div>
-<nav class="drawer" id="drawer" hidden aria-label="Contents"><h3>Contents</h3><a id="srcLink" target="_blank" rel="noopener noreferrer" hidden>Open the original page ↗</a><ul class="toc" id="toc"></ul><h3 id="wlH" style="margin-top:18px" hidden>Wordlist</h3><button class="btn" id="wlCopy" type="button" hidden>Copy list</button><ul class="notes" id="wls"></ul><h3 id="bmH" style="margin-top:18px" hidden>Bookmarks</h3><ul class="notes" id="bms"></ul><h3 id="notesH" style="margin-top:18px" hidden>Margin notes</h3><ul class="notes" id="notes"></ul></nav>
+<nav class="drawer" id="drawer" hidden aria-label="Contents"><h3>Contents</h3><a id="srcLink" target="_blank" rel="noopener noreferrer" hidden>Open the original page ↗</a><ul class="toc" id="toc"></ul><h3 id="wlH" style="margin-top:18px" hidden>Wordlist</h3><button class="btn" id="wlCopy" type="button" hidden>Copy list</button><ul class="notes" id="wls"></ul><h3 id="plH" style="margin-top:18px" hidden>Pictures</h3><ul class="notes pics" id="pls"></ul><h3 id="bmH" style="margin-top:18px" hidden>Bookmarks</h3><ul class="notes" id="bms"></ul><h3 id="notesH" style="margin-top:18px" hidden>Margin notes</h3><ul class="notes" id="notes"></ul></nav>
 <aside class="sheet" id="sheet" hidden aria-label="Reading settings">
   <h3>Reading</h3>
   <div class="ctl"><label>Text size</label><div class="seg" id="sSize"><button data-v="-1" type="button">A&minus;</button><button data-v="1" type="button">A+</button></div></div>
@@ -1867,6 +1876,31 @@ const IMG_MODELS=[
 const modelName=k=>(IMG_MODELS.find(m=>m[0]===k)||[k,k])[1].replace(/ \(.*$/,"");
 const curModel=()=>IMG_MODELS.some(m=>m[0]===prefs.artModel)?prefs.artModel:"flux-schnell";
 const plateOK=()=>LP===2&&LC===1;
+function renderPictures(){          // every picture made for this book, with caption and prompt, in reading order
+  const ul=$("pls");ul.textContent="";
+  const all=(book&&book.plates||[]).filter(p=>p.blob).slice().sort((a,b)=>a.c-b.c||a.after-b.after);
+  $("plH").hidden=!all.length;$("plH").textContent="Pictures ("+all.length+")";
+  all.forEach(p=>{
+    const li=document.createElement("li");
+    const th=document.createElement("button");th.type="button";th.className="pthumb";th.title="Go to this picture";
+    const im=document.createElement("img");im.src=plateUrl(p);im.alt=p.cap||"Illustration";th.append(im);
+    th.onclick=()=>{closeAll();if(book.pos.c!==p.c)showChapter(p.c,0);const r=V.sents[p.after];if(r)goPage(pageOf(r.el),true)};
+    const cp=document.createElement("div");cp.className="pcap";cp.textContent=p.cap||"(no caption)";
+    const meta=document.createElement("div");meta.className="pmeta";
+    const info=document.createElement("span");const ch=book.chapters[p.c];
+    info.textContent="Chapter "+(p.c+1)+(p.model?" \u00B7 "+modelName(p.model):"")+(p.shared?" \u00B7 shared":"");
+    const del=document.createElement("button");del.type="button";del.textContent="Delete";
+    del.onclick=()=>{
+      if(del.dataset.sure){removePlate(p);renderPictures();return}
+      del.dataset.sure=1;del.textContent="Really delete?";setTimeout(()=>{if(del.isConnected){del.dataset.sure="";del.textContent="Delete"}},3000);
+    };
+    meta.append(info,del);
+    const dt=document.createElement("details"),sm=document.createElement("summary");sm.textContent="Scene and prompt";
+    const pp=document.createElement("div");pp.className="pp";pp.textContent=(p.moment?"Scene chosen: "+p.moment+"\n\n":"")+(p.prompt||"No prompt was saved for this picture.");
+    dt.append(sm,pp);
+    li.append(th,cp,meta,dt);ul.append(li);
+  });
+}
 function plateCloseOpen(){     // hides any picture prompt that is showing; true if one was
   const f=flow.querySelector("figure.plate.showp");if(!f)return false;
   f.classList.remove("showp");const b=f.querySelector('button[data-act=prompt]');if(b)b.textContent="Show prompt";return true;
@@ -2255,7 +2289,7 @@ $("sKey").addEventListener("keydown",e=>e.stopPropagation());
 keyNote();
 addEventListener("resize",()=>bubClose());
 function closeAll(){$("drawer").hidden=true;$("sheet").hidden=true;$("scrim").hidden=true}
-$("tocBtn").onclick=()=>{closeAll();$("drawer").hidden=false;$("scrim").hidden=false};
+$("tocBtn").onclick=()=>{closeAll();renderPictures();$("drawer").hidden=false;$("scrim").hidden=false};
 $("setBtn").onclick=()=>{const was=!$("sheet").hidden;closeAll();if(!was){$("sheet").hidden=false;$("scrim").hidden=false}};
 $("scrim").onclick=closeAll;
 function applyPrefs(){
