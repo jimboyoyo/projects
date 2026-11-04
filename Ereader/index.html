@@ -373,6 +373,7 @@ html.reading{overflow:hidden}
   <div class="ctl"><label for="sKey">API key</label><input class="key" id="sKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-&hellip;"></div>
   <div class="ctl"><div class="seg"><button id="sKeySave" type="button">Save key</button><button id="sKeyClear" type="button">Remove key</button></div></div>
   <div class="ctl"><label for="sModel">Model</label><input class="key" id="sModel" type="text" autocomplete="off" spellcheck="false"></div>
+  <div class="ctl" id="sCodeRow" hidden><label for="sCode">Class code</label><input class="key" id="sCode" type="text" autocomplete="off" spellcheck="false" maxlength="60" placeholder="Ask your teacher"></div>
   <p class="note" id="keyNote"></p>
   <p class="note">The key is stored only in this browser and sent only to api.anthropic.com. Anyone using this browser profile or its developer tools can read it, so use it on your own devices and set a spending limit in the Console.</p>
   <h3 style="margin-top:6px">Appearance</h3>
@@ -613,7 +614,7 @@ $("relayUrl").addEventListener("keydown",e=>e.stopPropagation());
 $("relaySave").onclick=async()=>{
   const v=$("relayUrl").value.trim().replace(/[?#].*$/,"").replace(/\/+$/,""),n=$("relayNote");
   if(!/^https:\/\/\S+$/i.test(v)){n.textContent="Paste the full https address of the relay.";return}
-  store.set("marginalia.relay",v);$("relayUrl").value=v;n.textContent="Testing…";
+  store.set("marginalia.relay",v);$("relayUrl").value=v;refreshRelayAI();n.textContent="Testing…";
   try{
     const r=await fetch(v+"/",{});const j=await r.json().catch(()=>({}));
     n.textContent=r.ok&&j.service==="marginalia-relay"?"Saved. The relay works.":(j.error||"Saved, but this address did not answer like a Marginalia relay.");
@@ -1362,6 +1363,15 @@ $("lfUp").onclick=()=>lfStep(-1);$("lfDn").onclick=()=>lfStep(1);
 const API_URL="https://api.anthropic.com/v1/messages";
 const hasSel=()=>{const g=getSelection();return !!(g&&!g.isCollapsed&&g.toString().trim())};
 const getKey=()=>store.get("marginalia.apikey","");
+/* Claude through the relay: when the relay holds a key, readers need none of their own */
+const RA={enabled:false,needsCode:false};Object.assign(RA,store.get("marginalia.relayai",{}));
+const hasAI=()=>!!getKey()||(RA.enabled&&(!RA.needsCode||!!(prefs.classCode||"").trim()));
+const needMsg=orig=>RA.enabled&&RA.needsCode?"Type the class code in the Aa panel, under Lookup. You can also paste your own Anthropic key there.":orig;
+async function refreshRelayAI(){
+  if(!relayAddr()){RA.enabled=false;RA.needsCode=false;store.set("marginalia.relayai",{enabled:false,needsCode:false});keyNote();return}
+  try{const r=await fetch(relayAddr()+"/claude");const j=r.ok?await r.json():null;RA.enabled=!!(j&&j.enabled);RA.needsCode=!!(j&&j.needsCode)}catch(e){return}   // offline: keep what we knew
+  store.set("marginalia.relayai",{enabled:RA.enabled,needsCode:RA.needsCode});keyNote();
+}
 const bub=$("bub"),pill=$("askPill");
 const LK={ctl:null,anchor:null,cur:null,info:null,mode:"explain",view:null};
 const bubShown=()=>!bub.hidden;
@@ -1502,14 +1512,15 @@ function cachePut(k,v){const m=store.get("marginalia.lk",{});delete m[k];m[k]=v;
 const SA={stop:"",blocks:[]};          // what the last answer looked like, for error messages
 async function streamAnswer(payload,onText,signal){
   SA.stop="";SA.blocks=[];
-  const send=think=>fetch(API_URL,{method:"POST",signal,headers:{"content-type":"application/json","x-api-key":getKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+  const viaRelay=!getKey()&&RA.enabled,code=(prefs.classCode||"").trim();
+  const send=think=>fetch(viaRelay?relayAddr()+"/claude":API_URL,{method:"POST",signal,headers:viaRelay?{"content-type":"application/json",...(code?{"X-Class-Code":code}:{})}:{"content-type":"application/json","x-api-key":getKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
     body:JSON.stringify({model:prefs.model||"claude-haiku-5-5",max_tokens:(payload.max||450)+(think?0:3000),stream:true,system:payload.system,messages:payload.messages||[{role:"user",content:payload.user}],...(think?{thinking:{type:"disabled"}}:{})})});
   // Thinking is switched off: otherwise the model can spend the whole token allowance thinking and send no text at all.
   let res=await send(true);
-  if(res.status===400){let m="";try{m=((await res.clone().json()).error||{}).message||""}catch(e){}if(/thinking/i.test(m))res=await send(false)}   // a model that does not accept it: ask without, with extra room
+  if(res.status===400){let m="";try{const e=(await res.clone().json()).error;m=typeof e==="string"?e:(e&&e.message)||""}catch(e){}if(/thinking/i.test(m))res=await send(false)}   // a model that does not accept it: ask without, with extra room
   if(!res.ok){
-    let msg="";try{const j=await res.json();msg=(j.error&&j.error.message)||""}catch(e){}
-    const err=new Error(msg||("HTTP "+res.status));err.status=res.status;throw err;
+    let msg="";try{const j=await res.json();msg=typeof j.error==="string"?j.error:(j.error&&j.error.message)||""}catch(e){}
+    const err=new Error(msg||("HTTP "+res.status));err.status=res.status;err.relay=viaRelay;throw err;
   }
   const rd=res.body.getReader(),dec=new TextDecoder();let buf="",out="";
   for(;;){
@@ -1538,6 +1549,8 @@ const MODES={
 };
 function friendly(err){
   if(err.name==="AbortError")return null;
+  if(err.relay&&err.status===401)return "The class code is missing or wrong. Type it in the Aa panel, under Lookup.";
+  if(err.relay&&err.status>=500)return err.message;
   if(err.status===401)return "The API key was not accepted. Check it in the Aa panel under Lookup.";
   if(err.status===403)return "This key is not allowed to use that model. "+err.message;
   if(err.status===404)return "The model name was not found. Check the Model field in the Aa panel. "+err.message;
@@ -1570,7 +1583,7 @@ async function runLookup(info,mode){
   if(note&&note.mode===mode){LK.cur.a=note.a;setBub({...base,a:note.a,canPin:true});return}
   const ck=lkKey(c,mode,sel),hit=cacheGet(ck);
   if(hit){LK.cur.a=hit;setBub({...base,a:hit,canPin:!!info.anchor});return}
-  if(!getKey()){setBub({...base,a:"Add your Anthropic API key to get explanations. Create one in the Claude Console, paste it here, and set a spending limit there.",cls:"wait",needKey:true});$("bKey").focus();return}
+  if(!hasAI()){setBub({...base,a:needMsg("Add your Anthropic API key to get explanations. Create one in the Claude Console, paste it here, and set a spending limit there."),cls:"wait",needKey:true});$("bKey").focus();return}
   setBub({...base,a:"Thinking…",cls:"wait"});
   const ctl=LK.ctl=new AbortController(),mine=LK.cur,M=MODES[mode];
   const ch=book.chapters[c];
@@ -1599,7 +1612,7 @@ async function askQuestion(question){
   question=(question||"").trim();const cur=LK.cur;
   if(!question||!cur||cur.mode!=="ask")return;
   const info=LK.info;if(!info)return;
-  if(!getKey()){LK.askQ=question;setBub({q:short(cur.q),a:"Add your Anthropic API key to get answers. Paste it here; it stays in this browser.",cls:"wait",needKey:true});$("bKey").focus();return}
+  if(!hasAI()){LK.askQ=question;setBub({q:short(cur.q),a:needMsg("Add your Anthropic API key to get answers. Paste it here; it stays in this browser."),cls:"wait",needKey:true});$("bKey").focus();return}
   if(LK.ctl){try{LK.ctl.abort()}catch(e){}}
   const ctl=LK.ctl=new AbortController(),c=cur.c,ctx=contextFor(info),ch=book.chapters[c];
   const turn={q:question,a:""};cur.turns.push(turn);$("bAskQ").value="";
@@ -1733,11 +1746,11 @@ async function addWord(info){
   const w=t.slice(o0,o1);if(!w||/\s/.test(w)){toast("Select a single word");return}
   const anchor={s0:a.s0,o0,s1:a.s0,o1},c=book.pos.c;
   if(wordsOf().some(x=>x.c===c&&sameAnchor(x.a0,anchor))){toast("Already in the wordlist");return}
-  if(!getKey()){
+  if(!hasAI()){
     bubClose(false);LK.info={...info,anchor};LK.mode="word";
     showBub({first:info.rects[0],last:info.rects[info.rects.length-1]});
     LK.cur={c,q:w,mode:"word"};
-    setBub({q:w,a:"Add your Anthropic API key to get definitions. Paste it here; it stays in this browser.",cls:"wait",needKey:true,noModes:true});$("bKey").focus();return;
+    setBub({q:w,a:needMsg("Add your Anthropic API key to get definitions. Paste it here; it stays in this browser."),cls:"wait",needKey:true,noModes:true});$("bKey").focus();return;
   }
   bubClose(true);
   const prev=wordsOf().find(x=>x.w.toLowerCase()===w.toLowerCase()&&x.def);
@@ -2029,7 +2042,7 @@ async function makePlate(redo){
         toast("This picture was made earlier and is shared with your class.",4000);return;
       }
     }
-    if(!getKey()){throw new Error("Add your Anthropic API key first (Aa panel, under Lookup).")}
+    if(!hasAI()){throw new Error(needMsg("Add your Anthropic API key first (Aa panel, under Lookup)."))}
     toast("Painting an illustration\u2026 this takes about 20 seconds. Click the picture button again to cancel.",90000);
     const art=bk.art||(bk.art={}),style=styleOf(bk)||DEF_STYLE;
     const ch=bk.chapters[c];
@@ -2101,7 +2114,7 @@ function castShow(){const t=$("artCast");if(t&&document.activeElement!==t)t.valu
 $("artCast").addEventListener("change",e=>{if(!book)return;const art=book.art||(book.art={});art.bible=e.target.value.trim().slice(0,3000);art.bibleDone=true;putBook(book)});
 $("artRebuild").onclick=async()=>{
   if(!book){toast("Open a book first.",2500);return}
-  if(!getKey()){toast("Add your Anthropic API key first (under Lookup).",3500);return}
+  if(!hasAI()){toast(needMsg("Add your Anthropic API key first (under Lookup)."),3500);return}
   const bk=book,b=$("artRebuild");b.disabled=true;b.textContent="Writing\u2026";
   try{
     const r=await ensureBible(bk,null,true);if(book===bk)castShow();
@@ -2122,7 +2135,7 @@ $("setBtn").addEventListener("click",()=>{castShow();styleShow()});
 const STYLE_SYS="You choose an illustration style for a book. Answer with one line only: a style description of 12 to 25 English words that an AI image generator can use. Name the medium and technique, the colour palette, and the mood, choosing what really suits this book and not a default, so that it fits the book's era, setting and tone. Use positive wording only and never write no, not or without. Do not name any artist and do not name the book.";
 $("artSuggest").onclick=async()=>{
   if(!book){toast("Open a book first, so Claude can fit the style to it.",3000);return}
-  if(!getKey()){toast("Add your Anthropic API key first (under Lookup).",3500);return}
+  if(!hasAI()){toast(needMsg("Add your Anthropic API key first (under Lookup)."),3500);return}
   const bk=book,b=$("artSuggest");b.disabled=true;b.textContent="Thinking of a style\u2026";
   try{
     const ch=bk.chapters[bk.pos.c],open=ch&&ch.paras?ch.paras.filter(x=>typeof x==="string").join(" ").slice(0,500):"";
@@ -2276,7 +2289,10 @@ function renderNotes(){
   });
 }
 const MODE_NAME={ask:"Ask",define:"Define",explain:"Explain",simplify:"Simplify",analysis:"Analysis"};
-function keyNote(){$("keyNote").textContent=getKey()?"A key is saved in this browser.":"No key saved yet."}
+function keyNote(){
+  const row=$("sCodeRow");if(row)row.hidden=!(RA.enabled&&RA.needsCode);
+  $("keyNote").textContent=getKey()?"A key is saved in this browser. It is used instead of the relay's.":(RA.enabled?"Your relay provides Claude, so you do not need a key"+(RA.needsCode?((prefs.classCode||"").trim()?" (class code saved).":". Type the class code above."):"."):"No key saved yet.");
+}
 $("sKeySave").onclick=()=>{if(saveKey($("sKey").value))$("sKey").value=""};
 $("sKeyClear").onclick=()=>{store.set("marginalia.apikey","");$("sKey").value="";keyNote()};
 function langUI(){$("sLang").value=prefs.claudeLang;$("sLangOtherRow").hidden=prefs.claudeLang!=="other";$("sLangOther").value=prefs.claudeLangOther||""}
@@ -2286,7 +2302,9 @@ $("sLangOther").addEventListener("keydown",e=>e.stopPropagation());
 langUI();
 $("sModel").value=prefs.model;$("sModel").onchange=()=>{prefs.model=$("sModel").value.trim()||"claude-haiku-5-5";$("sModel").value=prefs.model;store.set("marginalia.prefs",prefs)};
 $("sKey").addEventListener("keydown",e=>e.stopPropagation());
-keyNote();
+$("sCode").value=prefs.classCode||"";$("sCode").addEventListener("keydown",e=>e.stopPropagation());
+$("sCode").oninput=()=>{prefs.classCode=$("sCode").value.trim();store.set("marginalia.prefs",prefs);keyNote()};
+keyNote();refreshRelayAI();
 addEventListener("resize",()=>bubClose());
 function closeAll(){$("drawer").hidden=true;$("sheet").hidden=true;$("scrim").hidden=true}
 $("tocBtn").onclick=()=>{closeAll();renderPictures();$("drawer").hidden=false;$("scrim").hidden=false};
