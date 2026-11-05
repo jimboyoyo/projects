@@ -254,7 +254,15 @@ html.reading{overflow:hidden}
 .drawer,.sheet{position:fixed;top:0;bottom:0;z-index:20;background:var(--surface);border:1px solid var(--line);padding:16px;overflow:auto;width:min(22rem,88vw);padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
 .drawer{left:0;border-width:0 1px 0 0;padding-left:max(16px,env(safe-area-inset-left,0px))}
 .sheet{right:0;border-width:0 0 0 1px;padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px;align-content:start}
-.drawer h3,.sheet h3{margin:0 0 10px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.drawer h3{margin:0 0 10px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sheet{background:var(--bg)}
+.sheet .aa{display:grid;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 14px 16px}
+.sheet .aa h3{margin:0 0 2px;padding-bottom:9px;border-bottom:2px solid var(--accent);font-size:.9rem;letter-spacing:.06em;text-transform:uppercase;color:var(--fg);font-weight:700}
+.sheet .aa .note{border-top:1px dashed var(--line);padding-top:10px}
+.sheet .aa .note:empty{display:none}
+.sheet .aa input:not([type=checkbox]),.sheet .aa textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:6px;padding:7px 8px;font:inherit;font-size:.85rem;color:var(--fg)}
+.sheet .aa textarea{resize:vertical}
+.sheet input.key,.sheet .ctl select,.sheet .ctl input[type=text],.sheet .ctl input[type=password],.sheet .ctl textarea{background:var(--bg)}
 .toc{list-style:none;margin:0;padding:0;display:grid;gap:2px}
 .toc button{width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:6px;line-height:1.3;overflow-wrap:anywhere}
 .toc button:hover{background:var(--mark)}
@@ -338,27 +346,36 @@ html.reading{overflow:hidden}
 <div class="scrim" id="scrim" hidden></div>
 <nav class="drawer" id="drawer" hidden aria-label="Contents"><h3>Contents</h3><a id="srcLink" target="_blank" rel="noopener noreferrer" hidden>Open the original page ↗</a><ul class="toc" id="toc"></ul><h3 id="wlH" style="margin-top:18px" hidden>Wordlist</h3><button class="btn" id="wlCopy" type="button" hidden>Copy list</button><ul class="notes" id="wls"></ul><h3 id="plH" style="margin-top:18px" hidden>Pictures</h3><ul class="notes pics" id="pls"></ul><h3 id="bmH" style="margin-top:18px" hidden>Bookmarks</h3><ul class="notes" id="bms"></ul><h3 id="notesH" style="margin-top:18px" hidden>Margin notes</h3><ul class="notes" id="notes"></ul></nav>
 <aside class="sheet" id="sheet" hidden aria-label="Reading settings">
+  <section class="aa">
   <h3>Reading</h3>
   <div class="ctl"><label>Text size</label><div class="seg" id="sSize"><button data-v="-1" type="button">A&minus;</button><button data-v="1" type="button">A+</button></div></div>
   <div class="ctl"><label>Typeface</label><div class="seg" id="sFont"><button data-v="serif" type="button">Serif</button><button data-v="sans" type="button">Sans</button></div></div>
   <div class="ctl"><label>Line width</label><div class="seg" id="sMeasure"><button data-v="28" type="button">Narrow</button><button data-v="34" type="button">Medium</button><button data-v="42" type="button">Wide</button></div></div>
   <div class="ctl"><label>Line spacing</label><div class="seg" id="sLh"><button data-v="1.5" type="button">Tight</button><button data-v="1.65" type="button">Normal</button><button data-v="1.85" type="button">Loose</button></div></div>
-  <h3 style="margin-top:6px">Line focus</h3>
+  </section>
+  <section class="aa">
+  <h3>Line focus</h3>
   <div class="ctl"><label>Highlight colour</label><div class="seg" id="sLfc"><button data-v="yellow" type="button">Yellow</button><button data-v="green" type="button">Green</button><button data-v="blue" type="button">Blue</button><button data-v="pink" type="button">Pink</button></div></div>
   <div class="ctl"><label>Extend highlight (lines above and below, fading)</label><div class="seg" id="sLfx"><button data-v="0" type="button">Off</button><button data-v="1" type="button">1</button><button data-v="2" type="button">2</button><button data-v="3" type="button">3</button></div></div>
   <div class="ctl"><label>Dim the rest of the page</label><div class="seg" id="sLfd"><button data-v="false" type="button">Off</button><button data-v="true" type="button">On</button></div></div>
   <p class="note">Switch on with the Line focus button in the header. Move the pointer to highlight a line, click to lock it, then use the arrow keys to move it. Esc releases the lock.</p>
-  <h3 style="margin-top:6px">Layout</h3>
+  </section>
+  <section class="aa">
+  <h3>Layout</h3>
   <div class="ctl"><label>Pages shown</label><div class="seg" id="sSpread"><button data-v="false" type="button">Single page</button><button data-v="true" type="button">Two-page spread</button></div></div>
   <div class="ctl"><label>Columns per page</label><div class="seg" id="sCols"><button data-v="1" type="button">1</button><button data-v="2" type="button">2</button><button data-v="3" type="button">3</button></div></div>
   <p class="note" id="layNote"></p>
-  <h3 style="margin-top:6px">Illustrations</h3>
+  </section>
+  <section class="aa">
+  <h3>Illustrations</h3>
   <div class="ctl"><label for="artModel">Picture model</label><select id="artModel"></select><p class="note" id="artModelNote" style="margin:4px 0 0"></p></div>
-  <div class="ctl"><label for="artStyle" id="artStyleLbl">Picture style (optional)</label><input id="artStyle" type="text" maxlength="200" placeholder="vintage ink and watercolour book illustration"><button class="btn" id="artSuggest" type="button" style="margin-top:6px">Suggest a style for this book</button></div>
+  <div class="ctl"><label for="artStyle" id="artStyleLbl">Picture style (optional)</label><input id="artStyle" type="text" maxlength="200" placeholder="vintage ink and watercolour book illustration"><button class="btn" id="artSuggest" type="button">Suggest a style for this book</button></div>
   <div class="ctl"><label for="teacherKey">Teacher key (optional)</label><input id="teacherKey" type="password" autocomplete="off" spellcheck="false" maxlength="100" placeholder="Only for teachers"><p class="note" style="margin:4px 0 0">Pictures are shared with everyone who reads the same book through your relay. With the teacher key, Draw again replaces the shared picture.</p></div>
-  <div class="ctl"><label for="artCast">Characters of this book (Claude's notes, you can edit them)</label><textarea id="artCast" rows="7" maxlength="3000" placeholder="Made the first time you illustrate a page. It describes how each character looks, from Claude's knowledge of the book."></textarea><button class="btn" id="artRebuild" type="button" style="margin-top:6px">Ask Claude to rewrite these notes</button></div>
+  <div class="ctl"><label for="artCast">Characters of this book (Claude's notes, you can edit them)</label><textarea id="artCast" rows="7" maxlength="3000" placeholder="Made the first time you illustrate a page. It describes how each character looks, from Claude's knowledge of the book."></textarea><button class="btn" id="artRebuild" type="button">Ask Claude to rewrite these notes</button></div>
   <p class="note">In a two-page spread with one column per page, the picture button in the header makes an illustration of the left page and adds it as a full picture page on the right. It needs the web-link relay with image support (see the README).</p>
-  <h3 style="margin-top:6px">Voice</h3>
+  </section>
+  <section class="aa">
+  <h3>Voice</h3>
   <div class="ctl"><label>Voice engine</label><div class="seg" id="sEngine"><button data-v="natural" type="button">Natural</button><button data-v="browser" type="button">Browser</button></div></div>
   <div class="ctl"><label for="vSel">Voice</label><select id="vSel"></select></div>
   <div class="ctl"><label>Speed</label><div class="seg" id="sSpeed"><button data-v="0.8" type="button">0.8&times;</button><button data-v="1" type="button">1&times;</button><button data-v="1.25" type="button">1.25&times;</button><button data-v="1.5" type="button">1.5&times;</button></div></div>
@@ -366,7 +383,9 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Highlight spoken word</label><div class="seg" id="sWh"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
   <div class="ctl"><label>Natural voice on GPU</label><div class="seg" id="sGpu"><button data-v="false" type="button">Off</button><button data-v="true" type="button">On</button></div></div>
   <p class="note">The natural voice is a one-time download kept in your browser: about 90 MB, or about 330 MB with GPU, which is much faster. Each voice also fetches a small file the first time you use it. The browser voice needs no download.</p>
-  <h3 style="margin-top:6px">Lookup</h3>
+  </section>
+  <section class="aa">
+  <h3>Lookup</h3>
   <p class="note">Select a word or passage in the book and choose &ldquo;Ask Claude&rdquo; for a short explanation. This uses your own Anthropic API key (from the Claude Console), so lookups are paid from your own credits.</p>
   <div class="ctl"><label for="sLang">Claude language</label><select id="sLang"><option value="auto">Same as the book</option><option value="sv">Svenska</option><option value="en">English</option><option value="other">Other&hellip;</option></select></div>
   <div class="ctl" id="sLangOtherRow" hidden><label for="sLangOther">Language</label><input class="key" id="sLangOther" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="e.g. Norsk, Deutsch, Espa&ntilde;ol"></div>
@@ -376,8 +395,11 @@ html.reading{overflow:hidden}
   <div class="ctl" id="sCodeRow" hidden><label for="sCode">Class code</label><input class="key" id="sCode" type="text" autocomplete="off" spellcheck="false" maxlength="60" placeholder="Ask your teacher"></div>
   <p class="note" id="keyNote"></p>
   <p class="note">The key is stored only in this browser and sent only to api.anthropic.com. Anyone using this browser profile or its developer tools can read it, so use it on your own devices and set a spending limit in the Console.</p>
-  <h3 style="margin-top:6px">Appearance</h3>
+  </section>
+  <section class="aa">
+  <h3>Appearance</h3>
   <div class="ctl"><label>Theme</label><div class="seg" id="sTheme"><button data-v="auto" type="button">Auto</button><button data-v="light" type="button">Light</button><button data-v="dark" type="button">Dark</button></div></div>
+  </section>
 </aside>
 
 <div class="pill" id="askPill" role="toolbar" aria-label="Selected text" hidden><button type="button" data-m="ask" title="Ask your own question about this">Ask</button><button type="button" data-m="define">Define</button><button type="button" data-m="explain">Explain</button><button type="button" data-m="simplify" title="Rewrite this in simpler words">Simplify</button><button type="button" data-m="analysis">Analyse</button><button type="button" data-m="images" title="Look up pictures of this" hidden>Images</button><span class="sep"></span><button type="button" data-m="bookmark" title="Bookmark this passage">Bookmark</button><button type="button" data-m="word" title="Add this word to the wordlist with a footnote" hidden>Add to wordlist</button></div>
