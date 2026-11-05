@@ -77,6 +77,7 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 .psheet .pfn .fnp sup{color:var(--accent);font-weight:600;margin-right:.3em;font-size:.85em}
 .pwrap{position:relative;margin:0 auto;overflow:hidden;break-inside:avoid;page-break-inside:avoid}
 @media print{
+#tabs{display:none!important}
   html,body{background:#fff!important;height:auto!important;overflow:visible!important}
   body>*:not(#printArea){display:none!important}
   #printArea{display:block}
@@ -115,6 +116,19 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 .bmodes{display:flex;gap:4px;margin:0 0 7px;flex-wrap:wrap}
 .bmodes button{background:none;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 10px;font-size:.75rem;cursor:pointer}
 .bmodes button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+/* pins: sticky-note tabs on the page edge, level with the pinned text */
+#tabs{position:absolute;inset:0;pointer-events:none;z-index:4}
+#tabs .ptab{position:absolute;pointer-events:auto;height:24px;width:18px;padding:0;border:0;cursor:pointer;background:var(--tc,#ffe66d);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s ease,box-shadow .15s ease}
+#tabs .ptab.r{left:calc(100% + 1px);border-radius:0 4px 4px 0;background-image:linear-gradient(to right,rgba(0,0,0,.07),transparent 40%)}
+#tabs .ptab.l{right:calc(100% + 1px);border-radius:4px 0 0 4px;background-image:linear-gradient(to left,rgba(0,0,0,.07),transparent 40%)}
+#paper.book #tabs .ptab{width:28px}
+#paper.book #tabs .ptab.r{left:calc(100% - 10px)}
+#paper.book #tabs .ptab.l{right:calc(100% - 10px)}
+#tabs .ptab::after{content:"";position:absolute;inset:-5px -5px -5px -3px}
+@media(max-width:599px){#tabs .ptab{width:11px}#paper.book #tabs .ptab{width:22px}}
+#tabs .ptab:hover,#tabs .ptab:focus-visible{outline:0;box-shadow:0 2px 7px rgba(0,0,0,.35)}
+#tabs .ptab.r:hover,#tabs .ptab.r:focus-visible{transform:translateX(5px)}
+#tabs .ptab.l:hover,#tabs .ptab.l:focus-visible{transform:translateX(-5px)}
 #ribbon{position:absolute;top:-2px;right:26px;width:18px;height:38px;background:var(--accent);clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%);z-index:3;pointer-events:none}
 #bmBtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;vertical-align:-3px}
 #bmBtn[aria-pressed="true"] svg{fill:currentColor}
@@ -322,7 +336,7 @@ html.reading{overflow:hidden}
 </section>
 
 <section class="reader" id="reader" hidden>
-  <div id="stage"><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="lfBar" hidden></div><div id="lfExt"></div><div id="flow"></div><div id="lfDim" hidden></div></div><div id="ribbon" hidden></div><div id="fnBand" hidden></div></div></div>
+  <div id="stage"><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="lfBar" hidden></div><div id="lfExt"></div><div id="flow"></div><div id="lfDim" hidden></div></div><div id="ribbon" hidden></div><div id="tabs"></div><div id="fnBand" hidden></div></div></div>
   <div id="foot">
   <div class="lfrow" id="lfRow" hidden><span class="txt" id="lfTxt" role="status"></span><button class="btn" id="lfUp" type="button" aria-label="Previous line" hidden>&#9650;</button><button class="btn" id="lfDn" type="button" aria-label="Next line" hidden>&#9660;</button></div>
   <div class="voice" id="voice" hidden>
@@ -812,7 +826,7 @@ function layout(){
   const H=Math.max(200,Math.floor(innerHeight-top-prog.offsetHeight-rootPad-6));
   stage.style.height=H+"px";
   // pick a layout that fits: P pages per screen, C text columns per page; step down when the screen is too narrow
-  const sw=stage.clientWidth,size=prefs.size,minCol=Math.round(13*size),base=prefs.measure*size;
+  const sw=stage.clientWidth-(stage.clientWidth<600?24:44),size=prefs.size   /* room at the sides for the pin tabs */,minCol=Math.round(13*size),base=prefs.measure*size;
   let P=prefs.spread?2:1,C=prefs.cols,N,G,colW;
   for(;;){
     N=P*C;
@@ -1703,12 +1717,35 @@ function openMark(mk){
 /* bookmarks: a whole page (kept by its first sentence) or a selected passage */
 let toastT=null;function toast(t,ms){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},ms||1800)}
 function pageMark(){return marksOf().find(b=>b.type==="page"&&b.c===book.pos.c&&V.sents[b.s]&&pageOf(V.sents[b.s].el)===page)}
+const TABCOL=["#ffe66d","#ff9fb2","#8fd3f4","#a8e6a1","#ffc078"];
+function tabsRender(){
+  const box=$("tabs");if(!box)return;box.textContent="";
+  if(!book||$("reader").hidden||!V.sents.length||!GEO)return;
+  const fr=flow.getBoundingClientRect(),N=LP*LC,colW=(pageW-(N-1)*gap)/N,H=24,used={L:[],R:[]};
+  const list=[];
+  notesOf().forEach(n=>{
+    if(n.c!==book.pos.c)return;const r=marksRects(n.id)[0];if(!r)return;
+    const k=Math.floor((r.left-fr.left+4)/(colW+gap))-page*N;if(k<0||k>=N)return;   // only pins on the page(s) now showing
+    list.push({n,y:r.top-fr.top+r.height/2,side:LP===2&&Math.floor(k/LC)===0?"L":"R"});
+  });
+  list.sort((a,b)=>a.y-b.y).forEach(t=>{
+    let y=GEO.vTop+t.y-H/2;const u=used[t.side],last=u[u.length-1];
+    if(last!==undefined&&y<last+H+2)y=last+H+2;                       // two pins on one row: the second tab sits just below
+    u.push(y);
+    const b=document.createElement("button");b.type="button";b.className="ptab "+(t.side==="L"?"l":"r");
+    b.style.top=Math.round(y)+"px";b.style.setProperty("--tc",TABCOL[t.n.id%TABCOL.length]);
+    b.title="Pinned: "+short(t.n.q);b.setAttribute("aria-label","Open pinned note: "+short(t.n.q));
+    b.addEventListener("mousedown",e=>e.stopPropagation());
+    b.addEventListener("click",e=>{e.stopPropagation();const mk=flow.querySelector('mark.pin[data-id="'+t.n.id+'"]');if(mk)openMark(mk)});
+    box.appendChild(b);
+  });
+}
 function bmUpdate(){
   if(!book)return;
   const pm=pageMark();
   $("bmBtn").setAttribute("aria-pressed",String(!!pm));
   const has=!!pm||marksOf().some(b=>b.type==="passage"&&b.c===book.pos.c&&b.a0&&V.sents[b.a0.s0]&&pageOf(V.sents[b.a0.s0].el)===page);
-  $("ribbon").hidden=!has;
+  $("ribbon").hidden=!has;tabsRender();
 }
 function togglePageBookmark(){
   if(!book||$("reader").hidden||!V.sents.length)return;
