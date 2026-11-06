@@ -77,7 +77,7 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 .psheet .pfn .fnp sup{color:var(--accent);font-weight:600;margin-right:.3em;font-size:.85em}
 .pwrap{position:relative;margin:0 auto;overflow:hidden;break-inside:avoid;page-break-inside:avoid}
 @media print{
-#tabs{display:none!important}
+#tabs,.stack,.shit,#stackTip{display:none!important}
   html,body{background:#fff!important;height:auto!important;overflow:visible!important}
   body>*:not(#printArea){display:none!important}
   #printArea{display:block}
@@ -225,6 +225,19 @@ html.reading{overflow:hidden}
 :is(#flow,.fclone){user-select:text;-webkit-user-select:text}
 :is(#flow,.fclone) ::selection{background:var(--hl)}
 #paper{position:relative;flex:none}
+/* page stacks beside a two-page spread: the pages read (left) and the pages still to read (right) */
+.stack{display:none;position:absolute;top:4px;bottom:4px;width:var(--t,0px);transition:width .35s ease;z-index:1;pointer-events:none;
+  background:repeating-linear-gradient(to right,var(--surface) 0,var(--surface) 1px,rgba(110,120,115,.6) 1px,rgba(110,120,115,.6) 2px),repeating-linear-gradient(to right,transparent 0,transparent 3px,rgba(0,0,0,.07) 3px,rgba(0,0,0,.07) 4px)}
+#paper.book .stack{display:block}
+#stackL{right:100%;border-radius:4px 0 0 4px;box-shadow:inset -4px 0 5px -3px rgba(0,0,0,.22)}
+#stackR{left:100%;border-radius:0 4px 4px 0;box-shadow:inset 4px 0 5px -3px rgba(0,0,0,.22)}
+.stack::after{content:"";position:absolute;top:-2px;bottom:-2px;width:3px;background:var(--fg);opacity:.5}
+#stackL::after{left:-3px;border-radius:3px 0 0 3px}
+#stackR::after{right:-3px;border-radius:0 3px 3px 0}
+.shit{display:none;position:absolute;top:0;bottom:0;width:20px;z-index:3;cursor:pointer}
+#paper.book .shit{display:block}
+#shitL{right:100%}#shitR{left:100%}
+#stackTip{position:absolute;z-index:7;pointer-events:none;white-space:nowrap;transform:translateX(-50%);padding:4px 9px;border-radius:6px;background:var(--fg);color:var(--bg);font:500 .75rem var(--font-ui);box-shadow:0 2px 8px rgba(0,0,0,.25)}
 /* page turn in a two-page spread */
 .fliplay{position:absolute;inset:0;z-index:6;pointer-events:none;perspective:2600px}
 .fhalf,.fsheet{position:absolute;top:0;height:100%;width:50%}
@@ -347,7 +360,7 @@ html.reading{overflow:hidden}
 </section>
 
 <section class="reader" id="reader" hidden>
-  <div id="stage"><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="lfBar" hidden></div><div id="lfExt"></div><div id="flow"></div><div id="lfDim" hidden></div></div><div id="ribbon" hidden></div><div id="tabs"></div><div id="fnBand" hidden></div></div></div>
+  <div id="stage"><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="lfBar" hidden></div><div id="lfExt"></div><div id="flow"></div><div id="lfDim" hidden></div></div><div id="ribbon" hidden></div><div id="tabs"></div><div class="stack" id="stackL"></div><div class="stack" id="stackR"></div><div class="shit" id="shitL" aria-label="Pages already read: hover to see where, click to go there" role="button"></div><div class="shit" id="shitR" aria-label="Pages still to read: hover to see where, click to go there" role="button"></div><div id="stackTip" hidden></div><div id="fnBand" hidden></div></div></div>
   <div id="foot">
   <div class="lfrow" id="lfRow" hidden><span class="txt" id="lfTxt" role="status"></span><button class="btn" id="lfUp" type="button" aria-label="Previous line" hidden>&#9650;</button><button class="btn" id="lfDn" type="button" aria-label="Next line" hidden>&#9660;</button></div>
   <div class="voice" id="voice" hidden>
@@ -872,6 +885,32 @@ function showChapter(i,frac){
   let p;if(frac==="last")p=pages-1;else p=Math.min(pages-1,Math.floor((frac||0)*pages+1e-6));
   goPage(p,true);
 }
+/* page stacks: thickness shows how much is read and how much is left; hovering or clicking them jumps through the book */
+let LASTDONE=0;
+function stacksUpdate(done){
+  LASTDONE=done;const L=$("stackL"),R=$("stackR");if(!L||!book)return;
+  const avail=Math.floor((stage.clientWidth-$("paper").offsetWidth)/2)-4;
+  const tmax=Math.max(1,Math.min(14,Math.round(3+book.total/9000),avail-3));     // longer books get thicker stacks, up to what fits beside the pages
+  L.style.setProperty("--t",Math.round(tmax*done)+"px");R.style.setProperty("--t",Math.round(tmax*(1-done))+"px");
+}
+function stackTarget(side,e){
+  const z=e.currentTarget.getBoundingClientRect(),p=Math.max(0,Math.min(1,(e.clientX-z.left)/z.width));
+  const t=side==="L"?LASTDONE*p:LASTDONE+(1-LASTDONE)*p;
+  let w=t*book.total,c=0;
+  while(c<book.chapters.length-1&&w>book.wc[c]){w-=book.wc[c];c++}
+  return {t,c,frac:book.wc[c]?Math.max(0,Math.min(1,w/book.wc[c])):0};
+}
+for(const side of ["L","R"]){
+  const z=$("shit"+side);
+  z.addEventListener("mousemove",e=>{
+    if(!book)return;const g=stackTarget(side,e),tip=$("stackTip"),pr=$("paper").getBoundingClientRect();
+    tip.textContent=short(book.chapters[g.c].title||("Chapter "+(g.c+1)))+" \u00b7 "+Math.round(g.t*100)+"%";tip.hidden=false;
+    tip.style.left=Math.round(e.clientX-pr.left)+"px";tip.style.top=Math.max(2,Math.round(e.clientY-pr.top-34))+"px";
+  });
+  z.addEventListener("mouseleave",()=>{$("stackTip").hidden=true});
+  z.addEventListener("mousedown",e=>e.stopPropagation());
+  z.addEventListener("click",e=>{e.stopPropagation();if(!book)return;const g=stackTarget(side,e);$("stackTip").hidden=true;userNav();flipCancel();showChapter(g.c,g.frac)});
+}
 function goPage(p,instant){
   bubClose();
   page=Math.max(0,Math.min(pages-1,p));
@@ -922,7 +961,7 @@ function prev(){if(!book)return;userNav();const c=book.pos.c;
 function updateUI(){
   const c=book.pos.c;let before=0;for(let i=0;i<c;i++)before+=book.wc[i];
   const done=(before+book.wc[c]*(page+1)/pages)/book.total;
-  $("pbar").style.width=(Math.min(1,done)*100).toFixed(1)+"%";
+  $("pbar").style.width=(Math.min(1,done)*100).toFixed(1)+"%";stacksUpdate(Math.min(1,done));
   $("chl").textContent=Math.round(Math.min(1,done)*100)+"% of book";
   const la=page*LP+1,lb=Math.min(la+LP-1,leaves);
   $("pgl").textContent=(la>=lb?"Page "+Math.min(la,leaves)+" of "+leaves:"Pages "+la+"\u2013"+lb+" of "+leaves)+" · ch. "+(c+1)+"/"+book.chapters.length;
