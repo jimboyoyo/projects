@@ -939,7 +939,7 @@ $("home").onclick=async()=>{if(book)await putBook(book);bubClose();lfSet(false,t
 const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",cloudVoice:"melo",brVoice:"",speed:1,highlight:true,wordHl:true,gpu:false,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,lfExt:0,claudeLang:"auto",claudeLangOther:"",v:2},store.get("marginalia.prefs",{}));
 if((prefs.v||0)<2){prefs.gpu=false;prefs.v=2}   // GPU was on by default before; it is slow to start and unreliable for this model, so CPU is now the default
 /* ---------- voice reader ---------- */
-const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noKokoro:false,noCloud:false,clError:"",detached:false};
+const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noKokoro:false,noCloud:false,clError:"",clLangNote:"",detached:false};
 const KK={worker:null,ready:null,pending:new Map(),nid:1,cache:new Map(),ctx:null,device:"",dtype:"",epoch:1,rtf:0,n:0,warm:0};
 const KK_VOICES=[["af_heart","Heart (US, female)"],["af_bella","Bella (US, female)"],["af_nicole","Nicole (US, female)"],["am_michael","Michael (US, male)"],["am_fenrir","Fenrir (US, male)"],["bf_emma","Emma (UK, female)"],["bm_george","George (UK, male)"],["bm_fable","Fable (UK, male)"]];
 const CL_VOICES=[["melo","Standard (fast, light on the allowance)"],["aura:asteria","Aura: Asteria (US, female)"],["aura:luna","Aura: Luna (US, female)"],["aura:stella","Aura: Stella (US, female)"],["aura:hera","Aura: Hera (US, female)"],["aura:athena","Aura: Athena (UK, female)"],["aura:orion","Aura: Orion (US, male)"],["aura:arcas","Aura: Arcas (US, male)"],["aura:perseus","Aura: Perseus (US, male)"],["aura:orpheus","Aura: Orpheus (US, male)"],["aura:zeus","Aura: Zeus (US, male)"],["aura:helios","Aura: Helios (UK, male)"],["aura:angus","Aura: Angus (Irish, male)"]];
@@ -956,14 +956,14 @@ function pickBrVoice(){
 }
 function fillVoiceSelect(){
   const sel=$("vSel");if(!sel)return;sel.textContent="";
-  const useKk=prefs.engine==="natural"&&!V.noKokoro,useCl=prefs.engine==="cloud"&&!V.noCloud;
+  const useKk=prefs.engine==="natural"&&!V.noKokoro,useCl=prefs.engine==="cloud"&&!V.noCloud&&clCanRead();
   const list=useCl?CL_VOICES:useKk?KK_VOICES.map(([id,n])=>[id,n]):brVoices.map(v=>[v.voiceURI,v.name+" ("+v.lang+")"]);
   if(!list.length){const o=document.createElement("option");o.textContent=useKk?"":"No voices found in this browser";sel.append(o);sel.disabled=true;return}
   sel.disabled=false;
   list.forEach(([id,n])=>{const o=document.createElement("option");o.value=id;o.textContent=n;sel.append(o)});
   sel.value=useCl?prefs.cloudVoice:useKk?prefs.kkVoice:(pickBrVoice()||{}).voiceURI||list[0][0];
 }
-$("vSel").addEventListener("change",e=>{if(prefs.engine==="cloud"&&!V.noCloud)prefs.cloudVoice=e.target.value;else if(prefs.engine==="natural"&&!V.noKokoro)prefs.kkVoice=e.target.value;else prefs.brVoice=e.target.value;store.set("marginalia.prefs",prefs);voiceRestartIfPlaying()});
+$("vSel").addEventListener("change",e=>{if(prefs.engine==="cloud"&&!V.noCloud&&clCanRead())prefs.cloudVoice=e.target.value;else if(prefs.engine==="natural"&&!V.noKokoro)prefs.kkVoice=e.target.value;else prefs.brVoice=e.target.value;store.set("marginalia.prefs",prefs);voiceRestartIfPlaying()});
 
 /* position helpers */
 function pageOf(el){
@@ -1147,17 +1147,55 @@ async function kkSpeak1(text,tok,rec,ci){
     if(rec&&prefs.highlight&&prefs.wordHl){wordsWrap(rec.el);wordsByTime(rec,ci,text,buf.duration*1000,tok)}
   });
 }
+/* Which language is the book in? The fast voice reads English, Spanish and French, so it needs to know. */
+const LANG_WORDS={
+  en:"the and of to a in that was it he she her his with you for had not but is as at on be this which they were have from by",
+  es:"el la de que y en los las un una por con no se su del al lo como más pero le es para sus fue ha me si",
+  fr:"le la les de des et un une que qui est dans pour pas il elle vous je nous ne au du sur ce se son sa avec",
+  sv:"och att det som en är på av för med jag han hon inte den till var har ett men vi så de hade sig",
+  de:"der die das und ist nicht ein eine zu mit sie er ich auf den von dem sich es auch dass war nur",
+  it:"il di che e la per un una non con si le del della è lo gli ma mi sono più come",
+  pt:"o a de que e do da em um uma não os as com para se por mas foi ele ela",
+  nl:"de het een van en is dat niet in te zijn op met aan hij ze er maar voor ook",
+  da:"og i det at en er som på for med til af ikke han den de jeg var har",
+  fi:"ja on ei että se hän oli mutta kuin ovat tämä niin hänen"
+};
+const LANG_NAME={en:"English",es:"Spanish",fr:"French",sv:"Swedish",de:"German",it:"Italian",pt:"Portuguese",nl:"Dutch",da:"Danish or Norwegian",fi:"Finnish"};
+const LANG_SETS=Object.fromEntries(Object.entries(LANG_WORDS).map(([k,v])=>[k,new Set(v.split(" "))]));
+const FAST_LANGS=["en","es","fr"];
+function detectLang(text){
+  const letters=text.replace(/[^\p{L}]/gu,"");if(letters.length<40)return "en";
+  const share=re=>(letters.match(re)||[]).length/letters.length;
+  if(share(/[\u3040-\u30ff]/gu)>0.1)return "ja";if(share(/[\uac00-\ud7af]/g)>0.1)return "ko";if(share(/[\u4e00-\u9fff]/g)>0.1)return "zh";
+  if(share(/[^\u0000-\u024f\u1e00-\u1eff]/gu)>0.3)return "other";
+  const toks=text.toLowerCase().match(/[\p{L}'’]+/gu)||[];if(toks.length<30)return "en";
+  let best="en",bs=-1,second=-1;
+  for(const [k,set] of Object.entries(LANG_SETS)){let n=0;for(const t of toks)if(set.has(t))n++;const sc=n/toks.length;if(sc>bs){second=bs;bs=sc;best=k}else if(sc>second)second=sc}
+  return bs<0.06?"en":best;       // too few common words to tell: assume English rather than block the voice
+}
+const LANGC=new Map();
+function bookLang(){
+  if(!book)return {code:"en",name:"English",ok:true};
+  let code=LANGC.get(book.id);
+  if(!code){
+    let t="";for(let c=Math.max(0,book.pos.c);c<book.chapters.length&&t.length<7000;c++)for(const p of book.chapters[c].paras){if(typeof p==="string")t+=p+" ";if(t.length>=7000)break}
+    code=detectLang(t);LANGC.set(book.id,code);
+  }
+  return {code,name:LANG_NAME[code]||"this language",ok:FAST_LANGS.includes(code)};
+}
+// the fast voice can read this book: Standard handles English, Spanish and French; the Aura voices only English
+function clCanRead(){const l=bookLang();return (prefs.cloudVoice||"melo").startsWith("aura:")?l.code==="en":l.ok}
 /* Fast voice: sentences are spoken by Cloudflare through the relay and played from the downloaded mp3 */
 const CL={cache:new Map()};
 async function clFetch(text){
   const v=prefs.cloudVoice||"melo",aura=v.startsWith("aura:");
-  const r=await fetch(relayAddr()+"/speech",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text,model:aura?"aura":"melo",voice:aura?v.slice(5):undefined})});
+  const r=await fetch(relayAddr()+"/speech",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text,model:aura?"aura":"melo",voice:aura?v.slice(5):undefined,lang:bookLang().code})});
   if(!r.ok){let m="";try{m=(await r.json()).error||""}catch(e){}const err=new Error(m||("HTTP "+r.status));err.status=r.status;throw err}
   const ab=await r.arrayBuffer();ensureCtx();if(!KK.ctx)throw new Error("Audio is not available in this browser.");
   return await KK.ctx.decodeAudioData(ab);
 }
 function clAudio(text){
-  const key=(prefs.cloudVoice||"melo")+"|"+text;let p=CL.cache.get(key);
+  const key=(prefs.cloudVoice||"melo")+"|"+bookLang().code+"|"+text;let p=CL.cache.get(key);
   if(p){CL.cache.delete(key);CL.cache.set(key,p);return p}
   p=clFetch(text);CL.cache.set(key,p);p.catch(()=>{if(CL.cache.get(key)===p)CL.cache.delete(key)});
   while(CL.cache.size>80)CL.cache.delete(CL.cache.keys().next().value);
@@ -1206,8 +1244,9 @@ function brSpeak(text,rec,ci,tok){
 /* playback */
 async function chooseEngine(tok){
   if(prefs.engine==="cloud"&&!V.noCloud){
-    if(relayAddr())return "cl";
-    V.noCloud=true;V.clError="no relay address is saved (Aa panel, under Lookup)";fillVoiceSelect();
+    if(!relayAddr()){V.noCloud=true;V.clError="no relay address is saved (Aa panel, under Lookup)";fillVoiceSelect()}
+    else if(clCanRead()){V.clLangNote="";fillVoiceSelect();return "cl"}
+    else{const l=bookLang();V.clLangNote="This book looks like "+l.name+". The fast voice reads "+((prefs.cloudVoice||"melo").startsWith("aura:")?"English only (choose Standard for Spanish and French)":"English, Spanish and French")+", so the browser voice is reading.";fillVoiceSelect()}
   }
   if(prefs.engine==="natural"&&!V.noKokoro){
     try{vStat("Starting natural voice…");await kkLoad();return "kk"}
@@ -1237,7 +1276,7 @@ async function voicePlay(){
     navigator.mediaSession.setActionHandler("play",voicePlay);navigator.mediaSession.setActionHandler("pause",()=>voiceStop());
     navigator.mediaSession.setActionHandler("nexttrack",()=>voiceSeek(1));navigator.mediaSession.setActionHandler("previoustrack",()=>voiceSeek(-1))}}catch(e){}
   const eng=await chooseEngine(tok);if(tok!==V.token)return;
-  V.eng=eng;V.baseStat=(eng==="kk"?kkInfo():eng==="cl"?"Reading aloud with the fast voice":(V.clError&&prefs.engine==="cloud"?"Fast voice unavailable ("+V.clError+"). Using your browser's voice.":V.kkError&&prefs.engine==="natural"?"Natural voice unavailable here ("+V.kkError+"). Using your browser's voice.":"Reading aloud with your browser's voice"));vStat(V.baseStat);
+  V.eng=eng;V.baseStat=(eng==="kk"?kkInfo():eng==="cl"?"Reading aloud with the fast voice ("+bookLang().name+")":(V.clLangNote&&prefs.engine==="cloud"?V.clLangNote:V.clError&&prefs.engine==="cloud"?"Fast voice unavailable ("+V.clError+"). Using your browser's voice.":V.kkError&&prefs.engine==="natural"?"Natural voice unavailable here ("+V.kkError+"). Using your browser's voice.":"Reading aloud with your browser's voice"));vStat(V.baseStat);
   voiceLoop(tok,eng);
 }
 async function voiceLoop(tok,eng){
@@ -1310,7 +1349,7 @@ $("vNext").onclick=()=>voiceSeek(1);
 $("vRepeat").onclick=voiceReplay;
 $("listenBtn").onclick=()=>{
   V.open=!V.open;$("voice").hidden=!V.open;$("listenBtn").setAttribute("aria-pressed",String(V.open));flow.classList.toggle("vmode",V.open);
-  if(V.open){playUI();vStat("Press play, or click any sentence to start there. \u2190 \u2192 step by sentence, \u2191 replays.");if(V.sents.length){V.idx=firstOnPage();mark(V.idx)}
+  if(V.open){fillVoiceSelect();playUI();vStat("Press play, or click any sentence to start there. \u2190 \u2192 step by sentence, \u2191 replays.");if(V.sents.length){V.idx=firstOnPage();mark(V.idx)}
     if(prefs.engine==="natural"&&!V.noKokoro)kkLoad().then(()=>{if(V.open&&!V.playing)kkPrefetch()}).catch(()=>{})}   // download and warm up while the reader decides
   else{voiceStop("");wordsClear();if(V.cur)V.cur.classList.remove("hl");V.cur=null;setDetached(false)}
   requestAnimationFrame(relayout);
