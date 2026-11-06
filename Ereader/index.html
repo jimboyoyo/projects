@@ -229,8 +229,8 @@ html.reading{overflow:hidden}
 #leaves{display:none;position:absolute;inset:0;box-shadow:0 2px 16px rgba(0,0,0,.10);border-radius:6px}
 #paper.book #leaves{display:flex}
 .leaf{flex:1;position:relative;background-color:var(--surface);border:1px solid var(--line);min-width:0}
-.leaf:first-child{border-right:0;border-radius:6px 0 0 6px;background-image:linear-gradient(to left,var(--spine),transparent 2.6em)}
-.leaf:last-child{border-left:0;border-radius:0 6px 6px 0;background-image:linear-gradient(to right,var(--spine),transparent 2.6em)}
+.leaf:first-child{border-right:0;border-radius:6px 0 0 6px;background-image:linear-gradient(to left,var(--spine),transparent var(--spw,1.4em))}
+.leaf:last-child{border-left:0;border-radius:0 6px 6px 0;background-image:linear-gradient(to right,var(--spine),transparent var(--spw,1.4em))}
 .leaf .pn{position:absolute;left:0;right:0;bottom:13px;text-align:center;font-family:var(--font-ui);font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums}
 #flow{height:100%;column-fill:auto;font-family:var(--read);font-size:var(--size);line-height:var(--lh);hyphens:auto;overflow-wrap:break-word;text-align:left;will-change:transform}
 @media (prefers-reduced-motion:no-preference){#flow{transition:transform .22s ease}}
@@ -830,7 +830,7 @@ function layout(){
   let P=prefs.spread?2:1,C=prefs.cols,N,G,colW;
   for(;;){
     N=P*C;
-    G=N===1?0:Math.round((P===2?3.4:2.4)*size);
+    G=N===1?0:Math.round((P===2?3.8:2.4)*size);
     const T=C===1?base:Math.round(base*0.72);
     const room=P===2?sw/N-G:(sw-(N-1)*G)/N;
     colW=Math.floor(Math.min(T,room));
@@ -840,7 +840,7 @@ function layout(){
   LP=P;LC=C;gap=G;
   pageW=N*colW+(N-1)*G;
   const book2=P===2,paperW=book2?pageW+G:pageW,vTop=book2?26:18,vBot=book2?44:18,fnH=(book&&book.words&&book.words.length)?Math.round(size*4.2):0;
-  const paper=$("paper");paper.style.width=paperW+"px";paper.style.height=H+"px";paper.classList.toggle("book",book2);
+  const paper=$("paper");paper.style.setProperty("--spw",Math.round(G*0.38)+"px");paper.style.width=paperW+"px";paper.style.height=H+"px";paper.classList.toggle("book",book2);
   view.style.left=(book2?Math.round(G/2):0)+"px";view.style.top=vTop+"px";view.style.width=pageW+"px";view.style.height=(H-vTop-vBot-fnH)+"px";GEO={paperW,H,vTop,viewH:H-vTop-vBot-fnH,fnH,left:book2?Math.round(G/2):0,size};{const fb=$("fnBand");fb.style.left=view.style.left;fb.style.top=(vTop+H-vTop-vBot-fnH)+"px";fb.style.width=pageW+"px";fb.style.height=Math.max(0,fnH-4)+"px";fb.style.fontSize=(size*0.68)+"px"}
   flow.style.width=pageW+"px";flow.style.columnCount=N;flow.style.columnGap=G+"px";
   flow.style.setProperty("--ph",Math.max(120,GEO.viewH)+"px");flow.classList.toggle("noplate",!(P===2&&C===1));
