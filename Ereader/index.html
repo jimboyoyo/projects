@@ -421,7 +421,7 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Highlight spoken sentence</label><div class="seg" id="sHl"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
   <div class="ctl"><label>Highlight spoken word</label><div class="seg" id="sWh"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
   <div class="ctl"><label>Natural voice on GPU</label><div class="seg" id="sGpu"><button data-v="false" type="button">Off</button><button data-v="true" type="button">On</button></div></div>
-  <p class="note">The natural voice is a one-time download kept in your browser: about 90 MB, or about 330 MB with GPU, which is much faster. Each voice also fetches a small file the first time you use it. The browser voice needs no download. Fast sends each sentence to your relay, which has it spoken by Cloudflare, so nothing is downloaded and it starts quickly. It needs the relay address (under Lookup). Standard is very light on the free allowance; the Aura voices sound a little better but use it up much faster. Speed also changes the pitch a little.</p>
+  <p class="note">The natural voice is a one-time download kept in your browser: about 90 MB, or about 330 MB with GPU, which is much faster. Each voice also fetches a small file the first time you use it. The browser voice needs no download. Fast sends each sentence to your relay, which has it spoken by Cloudflare, so nothing is downloaded and it starts quickly. It needs the relay address (under Lookup). Standard is very light on the free allowance; the Aura voices sound a little better but use it up much faster. Speed also changes the pitch a little. If your relay has a Google key, the Fast list also offers Google voices, which read any language.</p>
   </section>
   <section class="aa">
   <h3>Lookup</h3>
@@ -1031,6 +1031,8 @@ if((prefs.v||0)<2){prefs.gpu=false;prefs.v=2}   // GPU was on by default before;
 const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noKokoro:false,noCloud:false,clError:"",clLangNote:"",detached:false};
 const KK={worker:null,ready:null,pending:new Map(),nid:1,cache:new Map(),ctx:null,device:"",dtype:"",epoch:1,rtf:0,n:0,warm:0};
 const KK_VOICES=[["af_heart","Heart (US, female)"],["af_bella","Bella (US, female)"],["af_nicole","Nicole (US, female)"],["am_michael","Michael (US, male)"],["am_fenrir","Fenrir (US, male)"],["bf_emma","Emma (UK, female)"],["bm_george","George (UK, male)"],["bm_fable","Fable (UK, male)"]];
+const SP={gemini:false,needsCode:false};Object.assign(SP,store.get("marginalia.speechinfo",{}));
+const GM_VOICES=[["Kore","Firm"],["Zephyr","Bright"],["Puck","Upbeat"],["Charon","Informative"],["Fenrir","Excitable"],["Leda","Youthful"],["Orus","Firm"],["Aoede","Breezy"],["Callirrhoe","Easy-going"],["Autonoe","Bright"],["Enceladus","Breathy"],["Iapetus","Clear"],["Umbriel","Easy-going"],["Algieba","Smooth"],["Despina","Smooth"],["Erinome","Clear"],["Algenib","Gravelly"],["Rasalgethi","Informative"],["Laomedeia","Upbeat"],["Achernar","Soft"],["Alnilam","Firm"],["Schedar","Even"],["Gacrux","Mature"],["Pulcherrima","Forward"],["Achird","Friendly"],["Zubenelgenubi","Casual"],["Vindemiatrix","Gentle"],["Sadachbia","Lively"],["Sadaltager","Knowledgeable"],["Sulafat","Warm"]].map(([n,d])=>["gemini:"+n,"Google: "+n+" ("+d+")"]);
 const CL_VOICES=[["melo","Standard (fast, light on the allowance)"],["aura:asteria","Aura: Asteria (US, female)"],["aura:luna","Aura: Luna (US, female)"],["aura:stella","Aura: Stella (US, female)"],["aura:hera","Aura: Hera (US, female)"],["aura:athena","Aura: Athena (UK, female)"],["aura:orion","Aura: Orion (US, male)"],["aura:arcas","Aura: Arcas (US, male)"],["aura:perseus","Aura: Perseus (US, male)"],["aura:orpheus","Aura: Orpheus (US, male)"],["aura:zeus","Aura: Zeus (US, male)"],["aura:helios","Aura: Helios (UK, male)"],["aura:angus","Aura: Angus (Irish, male)"]];
 const ICON={play:'<svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg>',pause:'<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>'};
 const vStat=t=>{$("vStat").textContent=t;$("vStat").title=t};
@@ -1046,11 +1048,11 @@ function pickBrVoice(){
 function fillVoiceSelect(){
   const sel=$("vSel");if(!sel)return;sel.textContent="";
   const useKk=prefs.engine==="natural"&&!V.noKokoro,useCl=prefs.engine==="cloud"&&!V.noCloud&&clCanRead();
-  const list=useCl?CL_VOICES:useKk?KK_VOICES.map(([id,n])=>[id,n]):brVoices.map(v=>[v.voiceURI,v.name+" ("+v.lang+")"]);
+  const list=useCl?(SP.gemini?[...GM_VOICES,...CL_VOICES]:CL_VOICES):useKk?KK_VOICES.map(([id,n])=>[id,n]):brVoices.map(v=>[v.voiceURI,v.name+" ("+v.lang+")"]);
   if(!list.length){const o=document.createElement("option");o.textContent=useKk?"":"No voices found in this browser";sel.append(o);sel.disabled=true;return}
   sel.disabled=false;
   list.forEach(([id,n])=>{const o=document.createElement("option");o.value=id;o.textContent=n;sel.append(o)});
-  sel.value=useCl?prefs.cloudVoice:useKk?prefs.kkVoice:(pickBrVoice()||{}).voiceURI||list[0][0];
+  sel.value=useCl?clVoice():useKk?prefs.kkVoice:(pickBrVoice()||{}).voiceURI||list[0][0];
 }
 $("vSel").addEventListener("change",e=>{if(prefs.engine==="cloud"&&!V.noCloud&&clCanRead())prefs.cloudVoice=e.target.value;else if(prefs.engine==="natural"&&!V.noKokoro)prefs.kkVoice=e.target.value;else prefs.brVoice=e.target.value;store.set("marginalia.prefs",prefs);voiceRestartIfPlaying()});
 
@@ -1273,18 +1275,20 @@ function bookLang(){
   return {code,name:LANG_NAME[code]||"this language",ok:FAST_LANGS.includes(code)};
 }
 // the fast voice can read this book: Standard handles English, Spanish and French; the Aura voices only English
-function clCanRead(){const l=bookLang();return (prefs.cloudVoice||"melo").startsWith("aura:")?l.code==="en":l.ok}
+function clCanRead(){const l=bookLang(),v=clVoice();return v.startsWith("gemini:")?true:v.startsWith("aura:")?l.code==="en":l.ok}   // Google voices detect the language themselves
 /* Fast voice: sentences are spoken by Cloudflare through the relay and played from the downloaded mp3 */
 const CL={cache:new Map()};
+// the voice in use; a Google voice only counts when the relay has a Google key
+function clVoice(){const v=prefs.cloudVoice||"melo";return v.startsWith("gemini:")&&!SP.gemini?"melo":v}
 async function clFetch(text){
-  const v=prefs.cloudVoice||"melo",aura=v.startsWith("aura:");
-  const r=await fetch(relayAddr()+"/speech",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text,model:aura?"aura":"melo",voice:aura?v.slice(5):undefined,lang:bookLang().code})});
+  const v=clVoice(),aura=v.startsWith("aura:"),gem=v.startsWith("gemini:"),code=(prefs.classCode||"").trim();
+  const r=await fetch(relayAddr()+"/speech",{method:"POST",headers:{"content-type":"application/json",...(code?{"X-Class-Code":code}:{})},body:JSON.stringify({text,model:gem?"gemini":aura?"aura":"melo",voice:aura||gem?v.slice(v.indexOf(":")+1):undefined,lang:bookLang().code})});
   if(!r.ok){let m="";try{m=(await r.json()).error||""}catch(e){}const err=new Error(m||("HTTP "+r.status));err.status=r.status;throw err}
   const ab=await r.arrayBuffer();ensureCtx();if(!KK.ctx)throw new Error("Audio is not available in this browser.");
   return await KK.ctx.decodeAudioData(ab);
 }
 function clAudio(text){
-  const key=(prefs.cloudVoice||"melo")+"|"+bookLang().code+"|"+text;let p=CL.cache.get(key);
+  const key=clVoice()+"|"+bookLang().code+"|"+text;let p=CL.cache.get(key);
   if(p){CL.cache.delete(key);CL.cache.set(key,p);return p}
   p=clFetch(text);CL.cache.set(key,p);p.catch(()=>{if(CL.cache.get(key)===p)CL.cache.delete(key)});
   while(CL.cache.size>80)CL.cache.delete(CL.cache.keys().next().value);
@@ -1335,7 +1339,7 @@ async function chooseEngine(tok){
   if(prefs.engine==="cloud"&&!V.noCloud){
     if(!relayAddr()){V.noCloud=true;V.clError="no relay address is saved (Aa panel, under Lookup)";fillVoiceSelect()}
     else if(clCanRead()){V.clLangNote="";fillVoiceSelect();return "cl"}
-    else{const l=bookLang();V.clLangNote="This book looks like "+l.name+". The fast voice reads "+((prefs.cloudVoice||"melo").startsWith("aura:")?"English only (choose Standard for Spanish and French)":"English, Spanish and French")+", so the browser voice is reading.";fillVoiceSelect()}
+    else{const l=bookLang();V.clLangNote="This book looks like "+l.name+". The fast voice reads "+((prefs.cloudVoice||"melo").startsWith("aura:")?"English only (choose Standard for Spanish and French)":"English, Spanish and French")+", so the browser voice is reading."+(SP.gemini?" Google voices in the voice list read any language.":"");fillVoiceSelect()}
   }
   if(prefs.engine==="natural"&&!V.noKokoro){
     try{vStat("Starting natural voice…");await kkLoad();return "kk"}
@@ -1365,7 +1369,7 @@ async function voicePlay(){
     navigator.mediaSession.setActionHandler("play",voicePlay);navigator.mediaSession.setActionHandler("pause",()=>voiceStop());
     navigator.mediaSession.setActionHandler("nexttrack",()=>voiceSeek(1));navigator.mediaSession.setActionHandler("previoustrack",()=>voiceSeek(-1))}}catch(e){}
   const eng=await chooseEngine(tok);if(tok!==V.token)return;
-  V.eng=eng;V.baseStat=(eng==="kk"?kkInfo():eng==="cl"?"Reading aloud with the fast voice ("+bookLang().name+")":(V.clLangNote&&prefs.engine==="cloud"?V.clLangNote:V.clError&&prefs.engine==="cloud"?"Fast voice unavailable ("+V.clError+"). Using your browser's voice.":V.kkError&&prefs.engine==="natural"?"Natural voice unavailable here ("+V.kkError+"). Using your browser's voice.":"Reading aloud with your browser's voice"));vStat(V.baseStat);
+  V.eng=eng;V.baseStat=(eng==="kk"?kkInfo():eng==="cl"?(clVoice().startsWith("gemini:")?"Reading aloud with a Google voice":"Reading aloud with the fast voice ("+bookLang().name+")"):(V.clLangNote&&prefs.engine==="cloud"?V.clLangNote:V.clError&&prefs.engine==="cloud"?"Fast voice unavailable ("+V.clError+"). Using your browser's voice.":V.kkError&&prefs.engine==="natural"?"Natural voice unavailable here ("+V.kkError+"). Using your browser's voice.":"Reading aloud with your browser's voice"));vStat(V.baseStat);
   voiceLoop(tok,eng);
 }
 async function voiceLoop(tok,eng){
@@ -1574,7 +1578,8 @@ const RA={enabled:false,needsCode:false};Object.assign(RA,store.get("marginalia.
 const hasAI=()=>!!getKey()||(RA.enabled&&(!RA.needsCode||!!(prefs.classCode||"").trim()));
 const needMsg=orig=>RA.enabled&&RA.needsCode?"Type the class code in the Aa panel, under Lookup. You can also paste your own Anthropic key there.":orig;
 async function refreshRelayAI(){
-  if(!relayAddr()){RA.enabled=false;RA.needsCode=false;store.set("marginalia.relayai",{enabled:false,needsCode:false});keyNote();return}
+  if(!relayAddr()){RA.enabled=false;RA.needsCode=false;SP.gemini=false;SP.needsCode=false;store.set("marginalia.relayai",{enabled:false,needsCode:false});store.set("marginalia.speechinfo",{gemini:false,needsCode:false});keyNote();fillVoiceSelect();return}
+  try{const r=await fetch(relayAddr()+"/speech");const j=r.ok?await r.json():null;SP.gemini=!!(j&&j.gemini);SP.needsCode=!!(j&&j.needsCode);store.set("marginalia.speechinfo",{gemini:SP.gemini,needsCode:SP.needsCode});fillVoiceSelect()}catch(e){}
   try{const r=await fetch(relayAddr()+"/claude");const j=r.ok?await r.json():null;RA.enabled=!!(j&&j.enabled);RA.needsCode=!!(j&&j.needsCode)}catch(e){return}   // offline: keep what we knew
   store.set("marginalia.relayai",{enabled:RA.enabled,needsCode:RA.needsCode});keyNote();
 }
@@ -2519,7 +2524,7 @@ function renderNotes(){
 }
 const MODE_NAME={ask:"Ask",define:"Define",explain:"Explain",simplify:"Simplify",analysis:"Analysis"};
 function keyNote(){
-  const row=$("sCodeRow");if(row)row.hidden=!(RA.enabled&&RA.needsCode);
+  const row=$("sCodeRow");if(row)row.hidden=!((RA.enabled&&RA.needsCode)||(SP.gemini&&SP.needsCode));
   $("keyNote").textContent=getKey()?"A key is saved in this browser. It is used instead of the relay's.":(RA.enabled?"Your relay provides Claude, so you do not need a key"+(RA.needsCode?((prefs.classCode||"").trim()?" (class code saved).":". Type the class code above."):"."):"No key saved yet.");
 }
 $("sKeySave").onclick=()=>{if(saveKey($("sKey").value))$("sKey").value=""};
