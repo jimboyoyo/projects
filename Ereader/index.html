@@ -417,6 +417,7 @@ html.reading{overflow:hidden}
   <h3>Voice</h3>
   <div class="ctl"><label>Voice engine</label><div class="seg" id="sEngine"><button data-v="natural" type="button">Natural</button><button data-v="cloud" type="button">Fast</button><button data-v="browser" type="button">Browser</button></div></div>
   <div class="ctl"><label for="vSel">Voice</label><select id="vSel"></select></div>
+  <div class="ctl" id="vStyleRow" hidden><label for="vStyle" id="vStyleLbl">Reading style (optional)</label><textarea id="vStyle" rows="3" maxlength="300" placeholder="How the narrator should sound, for example: a calm, warm storyteller; unhurried, with quiet drama in tense moments."></textarea><button class="btn" id="vStyleSuggest" type="button">Suggest a style for this book</button><p class="note" style="margin:4px 0 0">Google voices only. It is sent with every sentence, so it changes how the book is read. Saved for this book.</p></div>
   <div class="ctl"><label>Speed</label><div class="seg" id="sSpeed"><button data-v="0.8" type="button">0.8&times;</button><button data-v="1" type="button">1&times;</button><button data-v="1.25" type="button">1.25&times;</button><button data-v="1.5" type="button">1.5&times;</button></div></div>
   <div class="ctl"><label>Highlight spoken sentence</label><div class="seg" id="sHl"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
   <div class="ctl"><label>Highlight spoken word</label><div class="seg" id="sWh"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
@@ -1046,6 +1047,7 @@ function pickBrVoice(){
   return brVoices.slice().sort((a,b)=>rank(a)-rank(b))[0]||null;
 }
 function fillVoiceSelect(){
+  vStyleShow();
   const sel=$("vSel");if(!sel)return;sel.textContent="";
   const useKk=prefs.engine==="natural"&&!V.noKokoro,useCl=prefs.engine==="cloud"&&!V.noCloud&&clCanRead();
   const list=useCl?(SP.gemini?[...GM_VOICES,...CL_VOICES]:CL_VOICES):useKk?KK_VOICES.map(([id,n])=>[id,n]):brVoices.map(v=>[v.voiceURI,v.name+" ("+v.lang+")"]);
@@ -1054,7 +1056,7 @@ function fillVoiceSelect(){
   list.forEach(([id,n])=>{const o=document.createElement("option");o.value=id;o.textContent=n;sel.append(o)});
   sel.value=useCl?clVoice():useKk?prefs.kkVoice:(pickBrVoice()||{}).voiceURI||list[0][0];
 }
-$("vSel").addEventListener("change",e=>{if(prefs.engine==="cloud"&&!V.noCloud&&clCanRead())prefs.cloudVoice=e.target.value;else if(prefs.engine==="natural"&&!V.noKokoro)prefs.kkVoice=e.target.value;else prefs.brVoice=e.target.value;store.set("marginalia.prefs",prefs);voiceRestartIfPlaying()});
+$("vSel").addEventListener("change",e=>{if(prefs.engine==="cloud"&&!V.noCloud&&clCanRead())prefs.cloudVoice=e.target.value;else if(prefs.engine==="natural"&&!V.noKokoro)prefs.kkVoice=e.target.value;else prefs.brVoice=e.target.value;store.set("marginalia.prefs",prefs);vStyleShow();voiceRestartIfPlaying()});
 
 /* position helpers */
 function pageOf(el){
@@ -1279,16 +1281,23 @@ function clCanRead(){const l=bookLang(),v=clVoice();return v.startsWith("gemini:
 /* Fast voice: sentences are spoken by Cloudflare through the relay and played from the downloaded mp3 */
 const CL={cache:new Map()};
 // the voice in use; a Google voice only counts when the relay has a Google key
+function vstyleOf(bk){return((bk&&bk.vstyle)||prefs.voiceStyle||"").trim().slice(0,300)}   // this book's reading style, else the shared one
+function vStyleShow(){
+  const row=$("vStyleRow");if(!row)return;
+  row.hidden=!(SP.gemini&&prefs.engine==="cloud"&&!V.noCloud&&clVoice().startsWith("gemini:"));
+  $("vStyleLbl").textContent=book?"Reading style for this book (optional)":"Reading style (used for books that have none of their own)";
+  const t=$("vStyle");if(t&&document.activeElement!==t)t.value=vstyleOf(book);
+}
 function clVoice(){const v=prefs.cloudVoice||"melo";return v.startsWith("gemini:")&&!SP.gemini?"melo":v}
 async function clFetch(text){
   const v=clVoice(),aura=v.startsWith("aura:"),gem=v.startsWith("gemini:"),code=(prefs.classCode||"").trim();
-  const r=await fetch(relayAddr()+"/speech",{method:"POST",headers:{"content-type":"application/json",...(code?{"X-Class-Code":code}:{})},body:JSON.stringify({text,model:gem?"gemini":aura?"aura":"melo",voice:aura||gem?v.slice(v.indexOf(":")+1):undefined,lang:bookLang().code})});
+  const r=await fetch(relayAddr()+"/speech",{method:"POST",headers:{"content-type":"application/json",...(code?{"X-Class-Code":code}:{})},body:JSON.stringify({text,model:gem?"gemini":aura?"aura":"melo",voice:aura||gem?v.slice(v.indexOf(":")+1):undefined,lang:bookLang().code,style:gem?vstyleOf(book):undefined})});
   if(!r.ok){let m="";try{m=(await r.json()).error||""}catch(e){}const err=new Error(m||("HTTP "+r.status));err.status=r.status;throw err}
   const ab=await r.arrayBuffer();ensureCtx();if(!KK.ctx)throw new Error("Audio is not available in this browser.");
   return await KK.ctx.decodeAudioData(ab);
 }
 function clAudio(text){
-  const key=clVoice()+"|"+bookLang().code+"|"+text;let p=CL.cache.get(key);
+  const key=clVoice()+"|"+bookLang().code+"|"+(clVoice().startsWith("gemini:")?vstyleOf(book):"")+"|"+text;let p=CL.cache.get(key);
   if(p){CL.cache.delete(key);CL.cache.set(key,p);return p}
   p=clFetch(text);CL.cache.set(key,p);p.catch(()=>{if(CL.cache.get(key)===p)CL.cache.delete(key)});
   while(CL.cache.size>80)CL.cache.delete(CL.cache.keys().next().value);
@@ -1427,7 +1436,7 @@ function voiceJump(i){
 function voiceRestartIfPlaying(){if(V.playing){V.idx=Math.max(0,V.idx);const i=V.idx;halt();voicePlayFrom(i)}}
 function voicePlayFrom(i){V.idx=i;V.playing=true;(async()=>{const tok=V.token;const eng=await chooseEngine(tok);if(tok!==V.token)return;V.eng=eng;voiceLoop(tok,eng)})()}
 function kkReset(){if(KK.worker){KK.worker.terminate();KK.worker=null}KK.ready=null;KK.pending.clear();KK.cache.clear();KK.device="";KK.rtf=0;KK.n=0}
-function voiceEngineChanged(){if(KK.worker&&((prefs.gpu&&KK.device!=="webgpu")||(!prefs.gpu&&KK.device==="webgpu")))kkReset();if(V.open&&prefs.engine==="natural"&&!V.noKokoro)kkLoad().catch(()=>{});if(prefs.engine==="natural"){V.noKokoro=false;V.kkError=""}if(prefs.engine==="cloud"){V.noCloud=false;V.clError=""}fillVoiceSelect();voiceRestartIfPlaying()}
+function voiceEngineChanged(){vStyleShow();if(KK.worker&&((prefs.gpu&&KK.device!=="webgpu")||(!prefs.gpu&&KK.device==="webgpu")))kkReset();if(V.open&&prefs.engine==="natural"&&!V.noKokoro)kkLoad().catch(()=>{});if(prefs.engine==="natural"){V.noKokoro=false;V.kkError=""}if(prefs.engine==="cloud"){V.noCloud=false;V.clError=""}fillVoiceSelect();voiceRestartIfPlaying()}
 function voiceChapterChanged(){
   // called whenever a chapter is rendered; if the reader (not the voice) changed chapter while playing, restart there
   setDetached(false);
@@ -2366,6 +2375,24 @@ $("teacherKey").value=prefs.teacherKey||"";
 $("teacherKey").addEventListener("input",e=>{prefs.teacherKey=e.target.value.slice(0,100);store.set("marginalia.prefs",prefs)});
 $("teacherKey").addEventListener("keydown",e=>e.stopPropagation());
 $("setBtn").addEventListener("click",()=>{castShow();styleShow()});
+const VSTYLE_SYS="You write a reading style for a text to speech narrator who will read a book aloud to teenage students. Answer with one or two short sentences only, in plain English, no quotes and no list. Say how the narrator should sound: pace, warmth, energy and mood, fitted to this book's genre, period and tone. Use positive wording only and never write no, not or without. Do not name the book, a character or a real person.";
+$("vStyle").addEventListener("input",e=>{const v=e.target.value.slice(0,300);if(book)book.vstyle=v.trim();else{prefs.voiceStyle=v;store.set("marginalia.prefs",prefs)}});
+$("vStyle").addEventListener("change",()=>{if(book)putBook(book);if(V.playing&&typeof voiceRestartIfPlaying==="function")voiceRestartIfPlaying()});
+$("setBtn").addEventListener("click",()=>vStyleShow());
+$("vStyleSuggest").onclick=async()=>{
+  if(!book){toast("Open a book first, then ask for a style that fits it.");return}
+  if(!hasAI()){toast(needMsg("A reading style is suggested by Claude."));return}
+  const bk=book,b=$("vStyleSuggest");b.disabled=true;b.textContent="Thinking of a style\u2026";
+  try{
+    const ch=bk.chapters[bk.pos.c],open=ch&&ch.paras?ch.paras.filter(x=>typeof x==="string").join(" ").slice(0,600):"";
+    const user=(bookLine()||"Title: not known.\n")+"Opening of the text the reader has now: "+open;
+    let t=String(await streamAnswer({system:VSTYLE_SYS,user,max:200},()=>{},null)||"").replace(/^["'\s]+|["'\s]+$/g,"").replace(/\s+/g," ").slice(0,300);
+    if(!t)throw new Error("No style came back. Try again.");
+    bk.vstyle=t;await putBook(bk);if(book===bk)$("vStyle").value=t;
+    toast("Reading style saved for this book. You can edit it.");
+    if(V.playing&&typeof voiceRestartIfPlaying==="function")voiceRestartIfPlaying();
+  }catch(e){toast(e.status?(friendly(e)||e.message):e.message,6000)}finally{b.disabled=false;b.textContent="Suggest a style for this book"}
+};
 const STYLE_SYS="You choose an illustration style for a book. Answer with one line only: a style description of 12 to 25 English words that an AI image generator can use. Name the medium and technique, the colour palette, and the mood, choosing what really suits this book and not a default, so that it fits the book's era, setting and tone. Use positive wording only and never write no, not or without. Do not name any artist and do not name the book.";
 $("artSuggest").onclick=async()=>{
   if(!book){toast("Open a book first, so Claude can fit the style to it.",3000);return}
