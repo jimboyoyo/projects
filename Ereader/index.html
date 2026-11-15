@@ -22,8 +22,9 @@ img{max-width:100%}
 .lfx{pointer-events:none;border-radius:6px}
 #lfDim{box-shadow:0 0 0 100vmax rgba(242,244,240,.78);box-shadow:0 0 0 100vmax color-mix(in srgb,var(--bg) 78%,transparent);z-index:2}
 @media (prefers-reduced-motion:reduce){#lfBar,.lfx{transition:none!important}}
-.lfrow{display:flex;align-items:center;gap:10px;padding:6px 0 0;font-size:.82rem;color:var(--muted)}
-.lfrow .txt{flex:1;min-width:0}
+.lfrow{display:flex;align-items:center;gap:10px;font-size:.82rem;color:var(--muted)}
+.lfrow .txt{flex:1;min-width:0;line-height:1.25;max-height:2.5em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.prog .lfrow .btn{padding:0 10px;height:2.2rem;font-size:.8rem}
 #lineBtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 /* ---------- lookup bubble ---------- */
 :is(#flow,.fclone) .s.noted{text-decoration:underline dotted var(--accent);text-decoration-thickness:1.5px;text-underline-offset:4px}
@@ -274,17 +275,22 @@ html.reading{overflow:hidden}
 :is(#flow,.fclone).vmode .s:hover:not(.hl){background:var(--mark)}
 :is(#flow,.fclone) hr{border:0;text-align:center;margin:1em 0;color:var(--muted)}
 :is(#flow,.fclone) hr::before{content:"\2022  \2022  \2022";letter-spacing:.4em}
-.prog{border-top:1px solid var(--line);padding:8px 0 4px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
-.prog .mid{display:grid;gap:5px;min-width:0}
+.prog{position:relative;border-top:1px solid var(--line);padding:8px 0 4px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:2.2rem;gap:12px;align-items:center;font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.prog .mid,.prog .voice,.prog .lfrow{grid-area:1/2;min-width:0}
+.prog .mid{display:grid;gap:5px}
+.prog.live .mid .row2{display:none}
+.prog.live .mid{position:static}
+.prog.live .bar{position:absolute;left:0;right:0;top:-1px;height:2px;border-radius:0;background:transparent}
+.prog.live .bar i{background:var(--accent)}
 .prog .row2{display:flex;justify-content:space-between;gap:10px;min-width:0}
 .prog .row2 span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .prog .btn{padding:6px 12px;font-size:1rem;line-height:1}
 .prog .btn:disabled{opacity:.35;cursor:default}
-.voice{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding:8px 0;min-width:0}
-.voice .btn{padding:6px 10px;line-height:0;display:inline-grid;place-items:center;min-width:2.4rem;min-height:2.2rem}
+.voice{display:flex;align-items:center;gap:8px;min-width:0}
+.voice .btn{padding:0 8px;line-height:0;display:inline-grid;place-items:center;min-width:2.3rem;height:2.2rem}
 .voice .btn svg{width:18px;height:18px;fill:currentColor;display:block}
 .voice .btn.main{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
-.voice .stat{flex:1 1 0;min-width:0;color:var(--muted);font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.voice .stat{flex:1 1 0;min-width:0;color:var(--muted);font-size:.8rem;line-height:1.25;max-height:2.5em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .voice .btn.txt{line-height:1.2;font-size:.85rem}
 @media (max-width:520px){.prog .row2{flex-wrap:wrap;gap:2px 10px}.prog .row2 span{white-space:normal;overflow:visible}}
 .ctl select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 8px;width:100%}
@@ -362,17 +368,17 @@ html.reading{overflow:hidden}
 <section class="reader" id="reader" hidden>
   <div id="stage"><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="lfBar" hidden></div><div id="lfExt"></div><div id="flow"></div><div id="lfDim" hidden></div></div><div id="ribbon" hidden></div><div id="tabs"></div><div class="stack" id="stackL"></div><div class="stack" id="stackR"></div><div class="shit" id="shitL" aria-label="Pages already read: hover to see where, click to go there" role="button"></div><div class="shit" id="shitR" aria-label="Pages still to read: hover to see where, click to go there" role="button"></div><div id="stackTip" hidden></div><div id="fnBand" hidden></div></div></div>
   <div id="foot">
-  <div class="lfrow" id="lfRow" hidden><span class="txt" id="lfTxt" role="status"></span><button class="btn" id="lfUp" type="button" aria-label="Previous line" hidden>&#9650;</button><button class="btn" id="lfDn" type="button" aria-label="Next line" hidden>&#9660;</button></div>
+  <div class="prog" id="prog">
+    <button class="btn" id="prev" type="button" aria-label="Previous page">&#8249;</button>
+      <div class="lfrow" id="lfRow" hidden><span class="txt" id="lfTxt" role="status"></span><button class="btn" id="lfUp" type="button" aria-label="Previous line" hidden>&#9650;</button><button class="btn" id="lfDn" type="button" aria-label="Next line" hidden>&#9660;</button></div>
   <div class="voice" id="voice" hidden>
     <button class="btn" id="vPrev" type="button" aria-label="Previous sentence" title="Previous sentence (←)"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
     <button class="btn main" id="vPlay" type="button" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg></button>
     <button class="btn" id="vNext" type="button" aria-label="Next sentence" title="Next sentence (→)"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
     <button class="btn" id="vRepeat" type="button" aria-label="Replay this sentence" title="Replay this sentence (↑ or R)"><svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg></button>
-    <span class="stat" id="vStat" role="status">Press play to start reading aloud from this page.</span>
+    <span class="stat" id="vStat" role="status">Press play to start reading.</span>
     <button class="btn txt" id="vFollow" type="button" hidden>Back to voice</button>
   </div>
-  <div class="prog" id="prog">
-    <button class="btn" id="prev" type="button" aria-label="Previous page">&#8249;</button>
     <div class="mid"><div class="bar"><i id="pbar" style="width:0"></i></div>
       <div class="row2"><span id="chl"></span><span id="pgl"></span><span id="left"></span></div></div>
     <button class="btn" id="next" type="button" aria-label="Next page">&#8250;</button>
@@ -1450,8 +1456,8 @@ $("vPrev").onclick=()=>voiceSeek(-1);
 $("vNext").onclick=()=>voiceSeek(1);
 $("vRepeat").onclick=voiceReplay;
 $("listenBtn").onclick=()=>{
-  V.open=!V.open;$("voice").hidden=!V.open;$("listenBtn").setAttribute("aria-pressed",String(V.open));flow.classList.toggle("vmode",V.open);
-  if(V.open){fillVoiceSelect();playUI();vStat("Press play, or click any sentence to start there. \u2190 \u2192 step by sentence, \u2191 replays.");if(V.sents.length){V.idx=firstOnPage();mark(V.idx)}
+  V.open=!V.open;footSync();$("listenBtn").setAttribute("aria-pressed",String(V.open));flow.classList.toggle("vmode",V.open);
+  if(V.open){fillVoiceSelect();playUI();vStat(matchMedia("(max-width:520px)").matches?"Press play or tap a sentence.":"Press play, or click any sentence to start there. \u2190 \u2192 step by sentence, \u2191 replays.");if(V.sents.length){V.idx=firstOnPage();mark(V.idx)}
     if(prefs.engine==="natural"&&!V.noKokoro)kkLoad().then(()=>{if(V.open&&!V.playing)kkPrefetch()}).catch(()=>{})}   // download and warm up while the reader decides
   else{voiceStop("");wordsClear();if(V.cur)V.cur.classList.remove("hl");V.cur=null;setDetached(false)}
   requestAnimationFrame(relayout);
@@ -1523,15 +1529,19 @@ function lfNearest(x,y){                      // x,y in flow coordinates; picks 
   }
   return best;
 }
+function footSync(){   // the footer row never changes height: listen or line focus replaces the progress text in place
+  const v=!!V.open,l=!!LF.on&&!v;
+  $("voice").hidden=!v;$("lfRow").hidden=!l;$("prog").classList.toggle("live",v||l);
+}
 function lfUI(){
   const t=$("lfTxt");
   $("lfUp").hidden=$("lfDn").hidden=!(LF.on&&LF.locked);
-  t.textContent=!LF.on?"":LF.locked?"Line locked. Arrow keys move it (↑ ↓ or ← →). Esc lets the pointer move it again.":"Line focus is on. Move the pointer over a line to highlight it, then click to lock it.";
+  t.textContent=!LF.on?"":LF.locked?"Locked. Arrow keys move the line. Esc lets go.":"Line focus: point at a line, click to lock it.";
 }
 function lfSet(on,quiet,teardown){
   LF.on=on;LF.locked=false;LF.cur=-1;LF.hover=-1;LF.lastPage=-1;
   $("lineBtn").setAttribute("aria-pressed",String(on));
-  $("lfRow").hidden=!on;
+  footSync();
   if(!on){lfBar.hidden=true;lfDim.hidden=true;lfExtClear()}else lfBar.hidden=true;
   if(!teardown){prefs.lineFocus=on;store.set("marginalia.prefs",prefs)}
   lfUI();
