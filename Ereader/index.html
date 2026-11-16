@@ -314,6 +314,10 @@ html.reading{overflow:hidden}
 .scrim{position:fixed;inset:0;background:rgba(10,14,18,.4);z-index:10}
 .ctl{display:grid;gap:6px}
 .ctl label{font-size:.85rem;color:var(--muted)}
+.pers{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pers button{display:grid;gap:1px;text-align:left;background:none;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font:inherit;color:var(--fg);cursor:pointer}
+.pers button b{font-weight:600;font-size:.85rem}.pers button span{font-size:.72rem;color:var(--muted)}
+.pers button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}.pers button[aria-pressed=true] span{color:inherit;opacity:.85}
 .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .seg button{flex:1;background:none;border:0;padding:7px 4px;border-right:1px solid var(--line)}
 .seg button:last-child{border-right:0}
@@ -421,14 +425,17 @@ html.reading{overflow:hidden}
   </section>
   <section class="aa">
   <h3>Voice</h3>
-  <div class="ctl"><label>Voice engine</label><div class="seg" id="sEngine"><button data-v="natural" type="button">Natural</button><button data-v="cloud" type="button">Fast</button><button data-v="browser" type="button">Browser</button></div></div>
-  <div class="ctl"><label for="vSel">Voice</label><select id="vSel"></select></div>
+  <div class="ctl"><label>Reader</label><div class="seg" id="sEngine"><button data-v="cloud" type="button">Read to me</button><button data-v="browser" type="button">Browser</button></div></div>
+  <div id="vFast">
+    <div class="ctl" id="vSrcRow"><label>Voices from</label><div class="seg" id="vSrc"><button data-v="google" type="button">Google</button><button data-v="cf" type="button">Cloudflare</button></div><p class="note" id="vSrcNote" style="margin:2px 0 6px;border:0;padding:0"></p></div>
+    <div class="ctl"><label>Narrator</label><div class="pers" id="vPers" role="group" aria-label="Narrator"></div></div>
+  </div>
+  <div class="ctl" id="vBrRow"><label for="vSel">Browser voice</label><select id="vSel"></select></div>
   <div class="ctl" id="vStyleRow" hidden><label for="vStyle" id="vStyleLbl">Reading style (optional)</label><textarea id="vStyle" rows="3" maxlength="300" placeholder="How the narrator should sound, for example: a calm, warm storyteller; unhurried, with quiet drama in tense moments."></textarea><button class="btn" id="vStyleSuggest" type="button">Suggest a style for this book</button><p class="note" style="margin:4px 0 0">Google voices only. It is sent with every sentence, so it changes how the book is read. Saved for this book.</p></div>
   <div class="ctl"><label>Speed</label><div class="seg" id="sSpeed"><button data-v="0.8" type="button">0.8&times;</button><button data-v="1" type="button">1&times;</button><button data-v="1.25" type="button">1.25&times;</button><button data-v="1.5" type="button">1.5&times;</button></div></div>
   <div class="ctl"><label>Highlight spoken sentence</label><div class="seg" id="sHl"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
   <div class="ctl"><label>Highlight spoken word</label><div class="seg" id="sWh"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
-  <div class="ctl"><label>Natural voice on GPU</label><div class="seg" id="sGpu"><button data-v="false" type="button">Off</button><button data-v="true" type="button">On</button></div></div>
-  <p class="note">The natural voice is a one-time download kept in your browser: about 90 MB, or about 330 MB with GPU, which is much faster. Each voice also fetches a small file the first time you use it. The browser voice needs no download. Fast sends each sentence to your relay, which has it spoken by Cloudflare, so nothing is downloaded and it starts quickly. It needs the relay address (under Lookup). Standard is very light on the free allowance; the Aura voices sound a little better but use it up much faster. Speed also changes the pitch a little. If your relay has a Google key, the Fast list also offers Google voices, which read any language.</p>
+    <p class="note">&ldquo;Read to me&rdquo; sends each sentence to your relay (address under Lookup), so nothing is downloaded and it starts quickly. Google voices sound the most natural and read any language. Cloudflare voices are lighter on the free allowance and read English; Spanish and French books get a plainer voice, and other languages need Google. The Browser option uses the voices built into your device and needs nothing. Speed also changes the pitch a little.</p>
   </section>
   <section class="aa">
   <h3>Lookup</h3>
@@ -1032,15 +1039,26 @@ let rt=null;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(relayo
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>setTimeout(relayout,50));
 $("home").onclick=async()=>{flipCancel();if(book)await putBook(book);bubClose();lfSet(false,true,true);$("lineBtn").hidden=true;$("bmBtn").hidden=true;$("printBtn").hidden=true;$("plateBtn").hidden=true;$("ribbon").hidden=true;$("fnBand").hidden=true;book=null;voiceStop("");wordsClear();V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
 
-const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"natural",kkVoice:"af_heart",cloudVoice:"melo",flip:true,brVoice:"",speed:1,highlight:true,wordHl:true,gpu:false,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,lfExt:0,claudeLang:"auto",claudeLangOther:"",v:2},store.get("marginalia.prefs",{}));
-if((prefs.v||0)<2){prefs.gpu=false;prefs.v=2}   // GPU was on by default before; it is slow to start and unreliable for this model, so CPU is now the default
+const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"cloud",fastSrc:"",persona:"yw",flip:true,brVoice:"",speed:1,highlight:true,wordHl:true,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,lfExt:0,claudeLang:"auto",claudeLangOther:"",v:3},store.get("marginalia.prefs",{}));
+if((prefs.v||0)<3){   // the Natural (in-browser) voice is gone; carry old choices over to the new narrators
+  if(prefs.engine==="natural")prefs.engine="cloud";
+  const cv=String(prefs.cloudVoice||"");if(cv.startsWith("gemini:"))prefs.fastSrc="google";else if(cv)prefs.fastSrc="cf";
+  const OLDMAP={"aura:zeus":"om","gemini:Algenib":"om","gemini:Charon":"om","gemini:Rasalgethi":"om","aura:hera":"ow","aura:athena":"ow","gemini:Gacrux":"ow","gemini:Vindemiatrix":"ow","aura:orion":"ym","aura:arcas":"ym","aura:perseus":"ym","aura:orpheus":"ym","aura:helios":"ym","aura:angus":"ym"};
+  const MEN=/^gemini:(Puck|Fenrir|Orus|Enceladus|Iapetus|Umbriel|Algieba|Alnilam|Schedar|Achird|Zubenelgenubi|Sadachbia|Sadaltager)$/;
+  prefs.persona=OLDMAP[cv]||(MEN.test(cv)?"ym":"yw");
+  delete prefs.kkVoice;delete prefs.gpu;delete prefs.cloudVoice;prefs.v=3;store.set("marginalia.prefs",prefs);
+}
 /* ---------- voice reader ---------- */
-const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noKokoro:false,noCloud:false,clError:"",clLangNote:"",detached:false};
-const KK={worker:null,ready:null,pending:new Map(),nid:1,cache:new Map(),ctx:null,device:"",dtype:"",epoch:1,rtf:0,n:0,warm:0};
-const KK_VOICES=[["af_heart","Heart (US, female)"],["af_bella","Bella (US, female)"],["af_nicole","Nicole (US, female)"],["am_michael","Michael (US, male)"],["am_fenrir","Fenrir (US, male)"],["bf_emma","Emma (UK, female)"],["bm_george","George (UK, male)"],["bm_fable","Fable (UK, male)"]];
+const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,eng:"br",noCloud:false,clError:"",clLangNote:"",detached:false};
+const AC={ctx:null};
 const SP={gemini:false,needsCode:false};Object.assign(SP,store.get("marginalia.speechinfo",{}));
-const GM_VOICES=[["Kore","Firm"],["Zephyr","Bright"],["Puck","Upbeat"],["Charon","Informative"],["Fenrir","Excitable"],["Leda","Youthful"],["Orus","Firm"],["Aoede","Breezy"],["Callirrhoe","Easy-going"],["Autonoe","Bright"],["Enceladus","Breathy"],["Iapetus","Clear"],["Umbriel","Easy-going"],["Algieba","Smooth"],["Despina","Smooth"],["Erinome","Clear"],["Algenib","Gravelly"],["Rasalgethi","Informative"],["Laomedeia","Upbeat"],["Achernar","Soft"],["Alnilam","Firm"],["Schedar","Even"],["Gacrux","Mature"],["Pulcherrima","Forward"],["Achird","Friendly"],["Zubenelgenubi","Casual"],["Vindemiatrix","Gentle"],["Sadachbia","Lively"],["Sadaltager","Knowledgeable"],["Sulafat","Warm"]].map(([n,d])=>["gemini:"+n,"Google: "+n+" ("+d+")"]);
-const CL_VOICES=[["melo","Standard (fast, light on the allowance)"],["aura:asteria","Aura: Asteria (US, female)"],["aura:luna","Aura: Luna (US, female)"],["aura:stella","Aura: Stella (US, female)"],["aura:hera","Aura: Hera (US, female)"],["aura:athena","Aura: Athena (UK, female)"],["aura:orion","Aura: Orion (US, male)"],["aura:arcas","Aura: Arcas (US, male)"],["aura:perseus","Aura: Perseus (US, male)"],["aura:orpheus","Aura: Orpheus (US, male)"],["aura:zeus","Aura: Zeus (US, male)"],["aura:helios","Aura: Helios (UK, male)"],["aura:angus","Aura: Angus (Irish, male)"]];
+// Four narrators per voice source: a younger and an older woman, a younger and an older man
+const PERSONAS=[
+  {id:"yw",name:"Younger woman",g:["Leda","youthful"],a:["luna","friendly"]},
+  {id:"ow",name:"Older woman",g:["Gacrux","mature"],a:["hera","smooth, warm"]},
+  {id:"ym",name:"Younger man",g:["Puck","upbeat"],a:["orion","calm, easy"]},
+  {id:"om",name:"Older man",g:["Algenib","gravelly"],a:["zeus","deep, steady"]}
+];
 const ICON={play:'<svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg>',pause:'<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>'};
 const vStat=t=>{$("vStat").textContent=t;$("vStat").title=t};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -1052,17 +1070,33 @@ function pickBrVoice(){
   const rank=v=>(/natural|neural|online/i.test(v.name)?0:/premium|enhanced/i.test(v.name)?1:/google/i.test(v.name)?2:3)+(v.default?-0.5:0);
   return brVoices.slice().sort((a,b)=>rank(a)-rank(b))[0]||null;
 }
+function srcOf(){return SP.gemini?(prefs.fastSrc||"google"):"cf"}   // Google voices only exist when the relay has a Google key
+function personaOf(){return PERSONAS.find(p=>p.id===prefs.persona)||PERSONAS[0]}
 function fillVoiceSelect(){
   vStyleShow();
-  const sel=$("vSel");if(!sel)return;sel.textContent="";
-  const useKk=prefs.engine==="natural"&&!V.noKokoro,useCl=prefs.engine==="cloud"&&!V.noCloud&&clCanRead();
-  const list=useCl?(SP.gemini?[...GM_VOICES,...CL_VOICES]:CL_VOICES):useKk?KK_VOICES.map(([id,n])=>[id,n]):brVoices.map(v=>[v.voiceURI,v.name+" ("+v.lang+")"]);
-  if(!list.length){const o=document.createElement("option");o.textContent=useKk?"":"No voices found in this browser";sel.append(o);sel.disabled=true;return}
+  const fast=prefs.engine==="cloud"&&!V.noCloud;
+  $("vFast").hidden=!fast;$("vBrRow").hidden=fast;
+  if(fast){
+    const src=srcOf();
+    $("vSrcRow").hidden=!SP.gemini;
+    $("vSrc").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===src)));
+    $("vSrcNote").textContent=src==="google"?"The most natural voices. They read any language and use your Google allowance.":"Quick and light on the free allowance. Cloudflare reads English; Spanish and French books get a plainer voice.";
+    const box=$("vPers");box.textContent="";
+    PERSONAS.forEach(p=>{const b=document.createElement("button");b.type="button";b.dataset.v=p.id;b.setAttribute("aria-pressed",String(p.id===personaOf().id));
+      const n=document.createElement("b");n.textContent=p.name;const d=document.createElement("span");d.textContent=(src==="google"?p.g[0]:p.a[0][0].toUpperCase()+p.a[0].slice(1))+", "+(src==="google"?p.g[1]:p.a[1]);
+      b.append(n,d);box.append(b)});
+    return;
+  }
+  const sel=$("vSel");sel.textContent="";
+  const list=brVoices.map(v=>[v.voiceURI,v.name+" ("+v.lang+")"]);
+  if(!list.length){const o=document.createElement("option");o.textContent="No voices found in this browser";sel.append(o);sel.disabled=true;return}
   sel.disabled=false;
   list.forEach(([id,n])=>{const o=document.createElement("option");o.value=id;o.textContent=n;sel.append(o)});
-  sel.value=useCl?clVoice():useKk?prefs.kkVoice:(pickBrVoice()||{}).voiceURI||list[0][0];
+  sel.value=(pickBrVoice()||{}).voiceURI||list[0][0];
 }
-$("vSel").addEventListener("change",e=>{if(prefs.engine==="cloud"&&!V.noCloud&&clCanRead())prefs.cloudVoice=e.target.value;else if(prefs.engine==="natural"&&!V.noKokoro)prefs.kkVoice=e.target.value;else prefs.brVoice=e.target.value;store.set("marginalia.prefs",prefs);vStyleShow();voiceRestartIfPlaying()});
+$("vSel").addEventListener("change",e=>{prefs.brVoice=e.target.value;store.set("marginalia.prefs",prefs);voiceRestartIfPlaying()});
+$("vPers").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;prefs.persona=b.dataset.v;store.set("marginalia.prefs",prefs);fillVoiceSelect();voiceRestartIfPlaying()});
+$("vSrc").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;prefs.fastSrc=b.dataset.v;store.set("marginalia.prefs",prefs);fillVoiceSelect();voiceRestartIfPlaying()});
 
 /* position helpers */
 function pageOf(el){
@@ -1109,7 +1143,7 @@ function wordWeights(text){
   const ws=text.match(/\S+/g)||[];
   return ws.map(w=>{const L=w.replace(/[^A-Za-z0-9]/g,"").length;let x=Math.max(2,L)+1;if(/[,;:\u2014)]["'\u201d\u2019]?$/.test(w))x+=3;if(/[.!?]["'\u201d\u2019)]*$/.test(w))x+=5;return x});
 }
-// Kokoro gives the total audio length but no word times, so share it out by word length and punctuation.
+// The cloud voices give the total audio length but no word times, so share it out by word length and punctuation.
 function wordsByTime(rec,ci,text,durMs,tok){
   if(!prefs.highlight||!prefs.wordHl||!V.wSpans)return;
   const map=wordMap(rec,ci),wt=wordWeights(text),tot=wt.reduce((a,b)=>a+b,0)||1,lead=40,span=Math.max(100,durMs*0.96-lead);
@@ -1135,116 +1169,11 @@ function userNav(){if(V.playing&&V.cur&&!V.detached)setDetached(true)}
 function voicePageChanged(){if(V.detached&&V.cur&&pageOf(V.cur)===page)setDetached(false)}
 $("vFollow").onclick=()=>{setDetached(false);followPage()};
 
-/* Multi-threaded CPU voice needs cross-origin isolation; a tiny service worker provides it when the page is hosted statically */
-(function(){
-  try{
-    if(window.crossOriginIsolated||!("serviceWorker" in navigator)||!window.isSecureContext||window.top!==window)return;
-    if(!("credentialless" in HTMLIFrameElement.prototype))return;          // Safari: not supported, the voice stays single-threaded
-    if(store.get("marginalia.coiTried",0)>=2)return;
-    const n=store.get("marginalia.coiTried",0)+1;
-    navigator.serviceWorker.register("coi-serviceworker.js").then(()=>navigator.serviceWorker.ready).then(()=>{
-      if(!window.crossOriginIsolated){store.set("marginalia.coiTried",n);location.reload()}     // one reload so the page is served with the isolation headers
-    }).catch(()=>{});
-  }catch(e){}
-})();
-/* Kokoro (natural voice) through a worker */
-const KK_KEEP=80;                                  // finished sentences kept for instant rewind and replay
-function kkInfo(){
-  let t="Reading aloud with the natural voice";
-  if(KK.device)t+=" ("+(KK.device==="webgpu"?"GPU":"CPU"+(KK.threads>1?", "+KK.threads+" threads":", 1 thread"))+(KK.rtf?", "+KK.rtf.toFixed(1)+"\u00d7 real time":"")+")";
-  if(KK.rtf>1.2&&KK.n>=2)t+=". Too slow for this device. In the Aa panel, set Voice to Browser";
-  return t;
-}
-function kkLoad(){
-  if(KK.ready)return KK.ready;
-  KK.ready=new Promise((res,rej)=>{
-    let w;
-    try{w=new Worker("tts-worker.js",{type:"module"})}catch(e){rej(e);return}
-    KK.worker=w;
-    w.onmessage=e=>{
-      const m=e.data;
-      if(m.type==="progress")vStat("Downloading natural voice\u2026 "+m.pct+"%");
-      else if(m.type==="status")vStat(m.text);
-      else if(m.type==="ready"){KK.device=m.device;KK.dtype=m.dtype;KK.warm=m.warmMs;KK.threads=m.threads||1;res(m);if(V.open&&!V.playing)vStat("Natural voice ready. Press play.");if(V.playing&&V.eng==="kk")kkPrefetch()}
-      else if(m.type==="start"){const p=KK.pending.get(m.id);if(p)p.started=true}
-      else if(m.type==="skipped"){const p=KK.pending.get(m.id);if(p){KK.pending.delete(m.id);p.rej(new Error("skipped"))}}
-      else if(m.type==="audio"){
-        const p=KK.pending.get(m.id);
-        const dur=m.audio.length/m.sr*1000;
-        console.log('[marginalia] sentence rendered in '+m.ms+' ms for '+Math.round(dur)+' ms of audio ('+KK.device+')');if(dur>400){KK.rtf=KK.rtf?KK.rtf*0.5+(m.ms/dur)*0.5:m.ms/dur;KK.n++;if(V.playing&&V.eng==="kk"&&!$("vStat").textContent.startsWith("Preparing")){V.baseStat=kkInfo();vStat(V.baseStat)}}
-        if(KK.device!=="webgpu"&&KK.n>=1&&KK.rtf>4&&V.eng==="kk"){setTimeout(kkTooSlow,0);return}
-        if(p){KK.pending.delete(m.id);p.res({f:m.audio,sr:m.sr})}
-      }
-      else if(m.type==="error"){if(m.id==null)rej(new Error(m.message));else{const p=KK.pending.get(m.id);if(p){KK.pending.delete(m.id);p.rej(new Error(m.message))}}}
-    };
-    w.onerror=()=>rej(new Error("The voice worker could not start."));
-    w.postMessage({type:"load",gpu:prefs.gpu,voice:prefs.kkVoice});
-    setTimeout(()=>rej(new Error("Loading the voice took too long.")),600000);
-  });
-  KK.ready.catch(()=>{KK.ready=null;if(KK.worker){KK.worker.terminate();KK.worker=null}});
-  return KK.ready;
-}
-function kkAudio(text){
-  const key=prefs.kkVoice+"|"+prefs.speed+"|"+text;let e=KK.cache.get(key);
-  if(e){KK.cache.delete(key);KK.cache.set(key,e);return e.p}          // refresh recency
-  e={started:false,done:false};
-  e.p=new Promise((res,rej)=>{
-    const id=KK.nid++;e.res=res;e.rej=rej;KK.pending.set(id,e);
-    KK.worker.postMessage({type:"gen",id,epoch:KK.epoch,text,voice:prefs.kkVoice,speed:prefs.speed});
-  });
-  e.p.then(()=>{e.done=true},()=>{if(KK.cache.get(key)===e)KK.cache.delete(key)});
-  KK.cache.set(key,e);
-  let done=0;for(const [k,v] of KK.cache)if(v.done)done++;
-  for(const [k,v] of KK.cache){if(done<=KK_KEEP)break;if(v.done){KK.cache.delete(k);done--}}
-  return e.p;
-}
-function kkPrefetch(){
-  if(!KK.worker)return;
-  const want=[];
-  for(let i=V.idx;i<V.sents.length&&want.length<3;i++)for(const c of V.sents[i].chunks){want.push(c);if(want.length>=3)break}
-  want.forEach(c=>{kkAudio(c).catch(()=>{})});
-}
-// Called when playback is interrupted: queued jobs for the old position are dropped by the worker.
-function kkCancelQueued(){
-  KK.epoch++;
-  if(KK.worker)KK.worker.postMessage({type:"epoch",n:KK.epoch});
-  for(const [k,v] of KK.cache)if(!v.started&&!v.done)KK.cache.delete(k);
-}
+/* An earlier version registered a small service worker for the in-browser voice. Remove it if it is still there. */
+try{if("serviceWorker" in navigator)navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>{const u=(r.active&&r.active.scriptURL)||"";if(/coi-serviceworker\.js$/.test(u)&&location.href.startsWith(r.scope))r.unregister()})).catch(()=>{})}catch(e){}
 function ensureCtx(){
-  if(!KK.ctx){try{KK.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){KK.ctx=null}}
-  if(KK.ctx&&KK.ctx.state==="suspended")KK.ctx.resume().catch(()=>{});
-}
-function kkTooSlow(){
-  const x=KK.rtf;V.noKokoro=true;V.kkError="it renders "+x.toFixed(0)+"\u00d7 slower than speech on this device";
-  kkReset();fillVoiceSelect();if(V.playing)voiceRestartIfPlaying();else vStat("Natural voice unavailable here ("+V.kkError+"). Using your browser's voice.");
-}
-function kkGpuFailed(){prefs.gpu=false;store.set("marginalia.prefs",prefs);applyPrefs();kkReset()}
-async function kkSpeak(text,tok,rec,ci){
-  try{return await kkSpeak1(text,tok,rec,ci)}
-  catch(err){
-    if(tok!==V.token)return;
-    if(KK.device==="webgpu"&&err.message!=="skipped"){      // the graphics driver reset or the GPU path failed: continue on the CPU
-      kkGpuFailed();vStat("The GPU stopped working, so the voice is restarting on the CPU\u2026");
-      await kkLoad();if(tok!==V.token)return;
-      V.baseStat=kkInfo();return kkSpeak1(text,tok,rec,ci);
-    }
-    throw err;
-  }
-}
-async function kkSpeak1(text,tok,rec,ci){
-  const wait=setTimeout(()=>{if(tok===V.token)vStat("Preparing the next sentence\u2026")},600);
-  let a;try{for(let t=0;;t++){try{a=await kkAudio(text);break}catch(err){if(err.message==='skipped'&&t<3&&tok===V.token){continue}throw err}}}finally{clearTimeout(wait)}
-  if(tok!==V.token)return;
-  if($("vStat").textContent.startsWith("Preparing"))vStat(V.baseStat||"");
-  const ctx=KK.ctx;if(!ctx)throw new Error("Audio is not available in this browser.");
-  if(ctx.state==="suspended")await ctx.resume();
-  const buf=ctx.createBuffer(1,a.f.length,a.sr);buf.copyToChannel(a.f,0);
-  await new Promise(res=>{
-    const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);
-    V.cancel=()=>{try{src.onended=null;src.stop()}catch(e){}res()};
-    src.onended=res;src.start();
-    if(rec&&prefs.highlight&&prefs.wordHl){wordsWrap(rec.el);wordsByTime(rec,ci,text,buf.duration*1000,tok)}
-  });
+  if(!AC.ctx){try{AC.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){AC.ctx=null}}
+  if(AC.ctx&&AC.ctx.state==="suspended")AC.ctx.resume().catch(()=>{});
 }
 /* Which language is the book in? The fast voice reads English, Spanish and French, so it needs to know. */
 const LANG_WORDS={
@@ -1282,8 +1211,8 @@ function bookLang(){
   }
   return {code,name:LANG_NAME[code]||"this language",ok:FAST_LANGS.includes(code)};
 }
-// the fast voice can read this book: Standard handles English, Spanish and French; the Aura voices only English
-function clCanRead(){const l=bookLang(),v=clVoice();return v.startsWith("gemini:")?true:v.startsWith("aura:")?l.code==="en":l.ok}   // Google voices detect the language themselves
+// can the chosen voice source read this book? Google reads any language; Cloudflare: Aura is English, the plainer Melo voice adds Spanish and French
+function clCanRead(){const l=bookLang(),v=clVoice();return v.startsWith("gemini:")?true:v==="melo"?l.ok:true}   // Google voices detect the language themselves
 /* Fast voice: sentences are spoken by Cloudflare through the relay and played from the downloaded mp3 */
 const CL={cache:new Map()};
 // the voice in use; a Google voice only counts when the relay has a Google key
@@ -1294,13 +1223,13 @@ function vStyleShow(){
   $("vStyleLbl").textContent=book?"Reading style for this book (optional)":"Reading style (used for books that have none of their own)";
   const t=$("vStyle");if(t&&document.activeElement!==t)t.value=vstyleOf(book);
 }
-function clVoice(){const v=prefs.cloudVoice||"melo";return v.startsWith("gemini:")&&!SP.gemini?"melo":v}
+function clVoice(){const p=personaOf();return srcOf()==="google"?"gemini:"+p.g[0]:(bookLang().code==="en"?"aura:"+p.a[0]:"melo")}
 async function clFetch(text){
   const v=clVoice(),aura=v.startsWith("aura:"),gem=v.startsWith("gemini:"),code=(prefs.classCode||"").trim();
   const r=await fetch(relayAddr()+"/speech",{method:"POST",headers:{"content-type":"application/json",...(code?{"X-Class-Code":code}:{})},body:JSON.stringify({text,model:gem?"gemini":aura?"aura":"melo",voice:aura||gem?v.slice(v.indexOf(":")+1):undefined,lang:bookLang().code,style:gem?vstyleOf(book):undefined})});
   if(!r.ok){let m="";try{m=(await r.json()).error||""}catch(e){}const err=new Error(m||("HTTP "+r.status));err.status=r.status;throw err}
-  const ab=await r.arrayBuffer();ensureCtx();if(!KK.ctx)throw new Error("Audio is not available in this browser.");
-  return await KK.ctx.decodeAudioData(ab);
+  const ab=await r.arrayBuffer();ensureCtx();if(!AC.ctx)throw new Error("Audio is not available in this browser.");
+  return await AC.ctx.decodeAudioData(ab);
 }
 function clAudio(text){
   const key=clVoice()+"|"+bookLang().code+"|"+(clVoice().startsWith("gemini:")?vstyleOf(book):"")+"|"+text;let p=CL.cache.get(key);
@@ -1319,7 +1248,7 @@ async function clSpeak(text,tok,rec,ci){
   let buf;try{buf=await clAudio(text)}finally{clearTimeout(wait)}
   if(tok!==V.token)return;
   if($("vStat").textContent.startsWith("Preparing"))vStat(V.baseStat||"");
-  const ctx=KK.ctx;if(!ctx)throw new Error("Audio is not available in this browser.");
+  const ctx=AC.ctx;if(!ctx)throw new Error("Audio is not available in this browser.");
   if(ctx.state==="suspended")await ctx.resume();
   const rate=prefs.speed||1;      // this voice has no speed setting of its own, so speed also changes the pitch a little
   await new Promise(res=>{
@@ -1354,11 +1283,7 @@ async function chooseEngine(tok){
   if(prefs.engine==="cloud"&&!V.noCloud){
     if(!relayAddr()){V.noCloud=true;V.clError="no relay address is saved (Aa panel, under Lookup)";fillVoiceSelect()}
     else if(clCanRead()){V.clLangNote="";fillVoiceSelect();return "cl"}
-    else{const l=bookLang();V.clLangNote="This book looks like "+l.name+". The fast voice reads "+((prefs.cloudVoice||"melo").startsWith("aura:")?"English only (choose Standard for Spanish and French)":"English, Spanish and French")+", so the browser voice is reading."+(SP.gemini?" Google voices in the voice list read any language.":"");fillVoiceSelect()}
-  }
-  if(prefs.engine==="natural"&&!V.noKokoro){
-    try{vStat("Starting natural voice…");await kkLoad();return "kk"}
-    catch(err){V.noKokoro=true;V.kkError=String(err.message||err).slice(0,90);fillVoiceSelect()}
+    else{const l=bookLang();V.clLangNote="This book looks like "+l.name+" and the Cloudflare voices cannot read it, so the browser voice is reading."+(SP.gemini?" Google voices read any language: choose Google in the Aa panel.":"");fillVoiceSelect()}
   }
   return "br";
 }
@@ -1366,7 +1291,7 @@ function playUI(){
   const b=$("vPlay");b.innerHTML=V.playing?ICON.pause:ICON.play;b.setAttribute("aria-label",V.playing?"Pause":"Play");
   try{if("mediaSession" in navigator)navigator.mediaSession.playbackState=V.playing?"playing":"paused"}catch(e){}
 }
-function halt(){V.token++;V.wstop=true;kkCancelQueued();clearTimeout(V.resumeT);if(V.cancel){const c=V.cancel;V.cancel=null;c()}try{if("speechSynthesis" in window)speechSynthesis.cancel()}catch(e){}}
+function halt(){V.token++;V.wstop=true;clearTimeout(V.resumeT);if(V.cancel){const c=V.cancel;V.cancel=null;c()}try{if("speechSynthesis" in window)speechSynthesis.cancel()}catch(e){}}
 function voiceStop(msg){
   V.playing=false;halt();playUI();
   vStat(msg||(book?"Paused. Press play to continue.":""));
@@ -1384,8 +1309,11 @@ async function voicePlay(){
     navigator.mediaSession.setActionHandler("play",voicePlay);navigator.mediaSession.setActionHandler("pause",()=>voiceStop());
     navigator.mediaSession.setActionHandler("nexttrack",()=>voiceSeek(1));navigator.mediaSession.setActionHandler("previoustrack",()=>voiceSeek(-1))}}catch(e){}
   const eng=await chooseEngine(tok);if(tok!==V.token)return;
-  V.eng=eng;V.baseStat=(eng==="kk"?kkInfo():eng==="cl"?(clVoice().startsWith("gemini:")?"Reading aloud with a Google voice":"Reading aloud with the fast voice ("+bookLang().name+")"):(V.clLangNote&&prefs.engine==="cloud"?V.clLangNote:V.clError&&prefs.engine==="cloud"?"Fast voice unavailable ("+V.clError+"). Using your browser's voice.":V.kkError&&prefs.engine==="natural"?"Natural voice unavailable here ("+V.kkError+"). Using your browser's voice.":"Reading aloud with your browser's voice"));vStat(V.baseStat);
+  V.eng=eng;V.baseStat=baseStatus(eng);vStat(V.baseStat);
   voiceLoop(tok,eng);
+}
+function baseStatus(eng){
+  return (eng==="cl"?(clVoice().startsWith("gemini:")?"Reading with a Google voice ("+personaOf().name.toLowerCase()+")":clVoice()==="melo"?"Reading with a plain Cloudflare voice ("+bookLang().name+")":"Reading with a Cloudflare voice ("+personaOf().name.toLowerCase()+")"):(V.clLangNote&&prefs.engine==="cloud"?V.clLangNote:V.clError&&prefs.engine==="cloud"?"The read-to-me voice is unavailable ("+V.clError+"). Using your browser's voice.":"Reading aloud with your browser's voice"));
 }
 async function voiceLoop(tok,eng){
   while(tok===V.token&&V.playing){
@@ -1396,15 +1324,14 @@ async function voiceLoop(tok,eng){
       continue;
     }
     const i=V.idx,s=V.sents[i];mark(i);followPage();
-    if(eng==="kk")kkPrefetch();else if(eng==="cl")clPrefetch();
+    if(eng==="cl")clPrefetch();
     for(let ci=0;ci<s.chunks.length;ci++){
       const ch=s.chunks[ci];
       if(tok!==V.token)return;
-      try{await(eng==="kk"?kkSpeak(ch,tok,s,ci):eng==="cl"?clSpeak(ch,tok,s,ci):brSpeak(ch,s,ci,tok))}
+      try{await(eng==="cl"?clSpeak(ch,tok,s,ci):brSpeak(ch,s,ci,tok))}
       catch(err){
         if(tok!==V.token)return;
-        if(eng==="kk"){V.noKokoro=true;eng="br";V.eng="br";fillVoiceSelect();vStat("The natural voice stopped working, so the browser voice takes over. ("+(err.message||err)+")");await brSpeak(ch,s,ci,tok)}
-        else if(eng==="cl"){V.noCloud=true;V.clError=String(err.message||err).slice(0,90);eng="br";V.eng="br";fillVoiceSelect();vStat("The fast voice stopped working, so the browser voice takes over. ("+V.clError+")");await brSpeak(ch,s,ci,tok)}
+        if(eng==="cl"){V.noCloud=true;V.clError=String(err.message||err).slice(0,90);eng="br";V.eng="br";fillVoiceSelect();vStat("The read-to-me voice stopped working, so the browser voice takes over. ("+V.clError+")");await brSpeak(ch,s,ci,tok)}
         else{voiceStop("Speech failed: "+(err.message||err));return}
       }
     }
@@ -1417,7 +1344,7 @@ async function voiceLoop(tok,eng){
 function resumeSoon(){
   // step keys can be pressed several times in a row: stop speaking now, start again once the presses settle
   halt();V.playing=true;playUI();const tok=V.token;
-  V.resumeT=setTimeout(()=>{if(tok===V.token)voiceLoop(tok,V.eng||"br")},V.eng==="kk"||V.eng==="cl"?260:180);
+  V.resumeT=setTimeout(()=>{if(tok===V.token)voiceLoop(tok,V.eng||"br")},V.eng==="cl"?260:180);
 }
 function voiceSeek(d){
   if(!book||!V.sents.length)return;
@@ -1440,9 +1367,8 @@ function voiceJump(i){
   (async()=>{const tok=V.token;const eng=await chooseEngine(tok);if(tok!==V.token)return;V.eng=eng;voiceLoop(tok,eng)})();
 }
 function voiceRestartIfPlaying(){if(V.playing){V.idx=Math.max(0,V.idx);const i=V.idx;halt();voicePlayFrom(i)}}
-function voicePlayFrom(i){V.idx=i;V.playing=true;(async()=>{const tok=V.token;const eng=await chooseEngine(tok);if(tok!==V.token)return;V.eng=eng;voiceLoop(tok,eng)})()}
-function kkReset(){if(KK.worker){KK.worker.terminate();KK.worker=null}KK.ready=null;KK.pending.clear();KK.cache.clear();KK.device="";KK.rtf=0;KK.n=0}
-function voiceEngineChanged(){vStyleShow();if(KK.worker&&((prefs.gpu&&KK.device!=="webgpu")||(!prefs.gpu&&KK.device==="webgpu")))kkReset();if(V.open&&prefs.engine==="natural"&&!V.noKokoro)kkLoad().catch(()=>{});if(prefs.engine==="natural"){V.noKokoro=false;V.kkError=""}if(prefs.engine==="cloud"){V.noCloud=false;V.clError=""}fillVoiceSelect();voiceRestartIfPlaying()}
+function voicePlayFrom(i){V.idx=i;V.playing=true;(async()=>{const tok=V.token;const eng=await chooseEngine(tok);if(tok!==V.token)return;V.eng=eng;V.baseStat=baseStatus(eng);vStat(V.baseStat);voiceLoop(tok,eng)})()}
+function voiceEngineChanged(){if(prefs.engine==="cloud"){V.noCloud=false;V.clError=""}fillVoiceSelect();voiceRestartIfPlaying()}
 function voiceChapterChanged(){
   // called whenever a chapter is rendered; if the reader (not the voice) changed chapter while playing, restart there
   setDetached(false);
@@ -1458,11 +1384,11 @@ $("vRepeat").onclick=voiceReplay;
 $("listenBtn").onclick=()=>{
   V.open=!V.open;footSync();$("listenBtn").setAttribute("aria-pressed",String(V.open));flow.classList.toggle("vmode",V.open);
   if(V.open){fillVoiceSelect();playUI();vStat(matchMedia("(max-width:520px)").matches?"Press play or tap a sentence.":"Press play, or click any sentence to start there. \u2190 \u2192 step by sentence, \u2191 replays.");if(V.sents.length){V.idx=firstOnPage();mark(V.idx)}
-    if(prefs.engine==="natural"&&!V.noKokoro)kkLoad().then(()=>{if(V.open&&!V.playing)kkPrefetch()}).catch(()=>{})}   // download and warm up while the reader decides
+}
   else{voiceStop("");wordsClear();if(V.cur)V.cur.classList.remove("hl");V.cur=null;setDetached(false)}
   requestAnimationFrame(relayout);
 };
-if(!("speechSynthesis" in window)&&!window.Worker)$("listenBtn").remove();
+if(!("speechSynthesis" in window)&&!(window.AudioContext||window.webkitAudioContext))$("listenBtn").remove();
 
 /* ---------- panels and settings ---------- */
 
@@ -2586,7 +2512,7 @@ function applyPrefs(){
   r.setProperty("--size",prefs.size+"px");r.setProperty("--measure",prefs.measure+"em");r.setProperty("--lh",prefs.lh);
   r.setProperty("--read",prefs.font==="sans"?"var(--font-ui)":"var(--font-read)");
   if(prefs.theme==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",prefs.theme);
-  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sWh","wordHl"],["sGpu","gpu"],["sSpread","spread"],["sFlip","flip"],["sCols","cols"],["sLfc","lfColor"],["sLfd","lfDim"],["sLfx","lfExt"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
+  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sWh","wordHl"],["sSpread","spread"],["sFlip","flip"],["sCols","cols"],["sLfc","lfColor"],["sLfd","lfDim"],["sLfx","lfExt"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
   store.set("marginalia.prefs",prefs);
   flow.classList.toggle("nohl",!prefs.highlight);flow.classList.toggle("nowh",!prefs.wordHl);lfApplyPrefs();if(!prefs.wordHl)wordsClear();
   if(typeof fillVoiceSelect==="function")fillVoiceSelect();
@@ -2594,7 +2520,7 @@ function applyPrefs(){
 }
 $("sSize").onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs.size=Math.max(14,Math.min(32,prefs.size+Number(b.dataset.v)*2));applyPrefs()};
 const bool=v=>v==="true";
-[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sWh","wordHl",bool],["sGpu","gpu",bool],["sSpread","spread",bool],["sFlip","flip",bool],["sCols","cols",Number],["sLfc","lfColor",String],["sLfd","lfDim",bool],["sLfx","lfExt",Number]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine"||k==="gpu")voiceEngineChanged()});
+[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sWh","wordHl",bool],["sSpread","spread",bool],["sFlip","flip",bool],["sCols","cols",Number],["sLfc","lfColor",String],["sLfd","lfDim",bool],["sLfx","lfExt",Number]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine")voiceEngineChanged()});
 applyPrefs();
 
 loadCatalog();renderShelf();
