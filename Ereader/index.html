@@ -316,6 +316,7 @@ html.reading{overflow:hidden}
 .ctl label{font-size:.85rem;color:var(--muted)}
 .pers{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .pers button{display:grid;gap:1px;text-align:left;background:none;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font:inherit;color:var(--fg);cursor:pointer}
+.pers button.wide{grid-column:1/-1}
 .pers button b{font-weight:600;font-size:.85rem}.pers button span{font-size:.72rem;color:var(--muted)}
 .pers button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}.pers button[aria-pressed=true] span{color:inherit;opacity:.85}
 .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
@@ -435,7 +436,7 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Speed</label><div class="seg" id="sSpeed"><button data-v="0.8" type="button">0.8&times;</button><button data-v="1" type="button">1&times;</button><button data-v="1.25" type="button">1.25&times;</button><button data-v="1.5" type="button">1.5&times;</button></div></div>
   <div class="ctl"><label>Highlight spoken sentence</label><div class="seg" id="sHl"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
   <div class="ctl"><label>Highlight spoken word</label><div class="seg" id="sWh"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
-    <p class="note">&ldquo;Read to me&rdquo; sends each sentence to your relay (address under Lookup), so nothing is downloaded and it starts quickly. Google voices sound the most natural and read any language. Cloudflare voices are lighter on the free allowance and read English; Spanish and French books get a plainer voice, and other languages need Google. The Browser option uses the voices built into your device and needs nothing. Speed also changes the pitch a little.</p>
+    <p class="note">&ldquo;Read to me&rdquo; sends each sentence to your relay (address under Lookup), so nothing is downloaded and it starts quickly. Google voices sound the most natural and read any language. Cloudflare voices are lighter on the free allowance: the four narrators read English, and Standard (the lightest) also reads Spanish and French. Other languages need Google. The Browser option uses the voices built into your device and needs nothing. Speed also changes the pitch a little.</p>
   </section>
   <section class="aa">
   <h3>Lookup</h3>
@@ -1043,7 +1044,7 @@ const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",
 if((prefs.v||0)<3){   // the Natural (in-browser) voice is gone; carry old choices over to the new narrators
   if(prefs.engine==="natural")prefs.engine="cloud";
   const cv=String(prefs.cloudVoice||"");if(cv.startsWith("gemini:"))prefs.fastSrc="google";else if(cv)prefs.fastSrc="cf";
-  const OLDMAP={"aura:zeus":"om","gemini:Algenib":"om","gemini:Charon":"om","gemini:Rasalgethi":"om","aura:hera":"ow","aura:athena":"ow","gemini:Gacrux":"ow","gemini:Vindemiatrix":"ow","aura:orion":"ym","aura:arcas":"ym","aura:perseus":"ym","aura:orpheus":"ym","aura:helios":"ym","aura:angus":"ym"};
+  const OLDMAP={"aura:zeus":"om","gemini:Algenib":"om","gemini:Charon":"om","gemini:Rasalgethi":"om","aura:hera":"ow","aura:athena":"ow","gemini:Gacrux":"ow","gemini:Vindemiatrix":"ow","melo":"std","aura:orion":"ym","aura:arcas":"ym","aura:perseus":"ym","aura:orpheus":"ym","aura:helios":"ym","aura:angus":"ym"};
   const MEN=/^gemini:(Puck|Fenrir|Orus|Enceladus|Iapetus|Umbriel|Algieba|Alnilam|Schedar|Achird|Zubenelgenubi|Sadachbia|Sadaltager)$/;
   prefs.persona=OLDMAP[cv]||(MEN.test(cv)?"ym":"yw");
   delete prefs.kkVoice;delete prefs.gpu;delete prefs.cloudVoice;prefs.v=3;store.set("marginalia.prefs",prefs);
@@ -1053,6 +1054,7 @@ const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,en
 const AC={ctx:null};
 const SP={gemini:false,needsCode:false};Object.assign(SP,store.get("marginalia.speechinfo",{}));
 // Four narrators per voice source: a younger and an older woman, a younger and an older man
+const STD={id:"std",name:"Standard",d:"plain voice, very light on the free allowance"};
 const PERSONAS=[
   {id:"yw",name:"Younger woman",g:["Leda","youthful"],a:["luna","friendly"]},
   {id:"ow",name:"Older woman",g:["Gacrux","mature"],a:["hera","smooth, warm"]},
@@ -1080,11 +1082,13 @@ function fillVoiceSelect(){
     const src=srcOf();
     $("vSrcRow").hidden=!SP.gemini;
     $("vSrc").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===src)));
-    $("vSrcNote").textContent=src==="google"?"The most natural voices. They read any language and use your Google allowance.":"Quick and light on the free allowance. Cloudflare reads English; Spanish and French books get a plainer voice.";
+    $("vSrcNote").textContent=src==="google"?"The most natural voices. They read any language and use your Google allowance.":"Quick and light on the free allowance. The four narrators read English; Standard also reads Spanish and French.";
     const box=$("vPers");box.textContent="";
-    PERSONAS.forEach(p=>{const b=document.createElement("button");b.type="button";b.dataset.v=p.id;b.setAttribute("aria-pressed",String(p.id===personaOf().id));
+    PERSONAS.forEach(p=>{const b=document.createElement("button");b.type="button";b.dataset.v=p.id;b.setAttribute("aria-pressed",String(p.id===personaOf().id&&!(src==="cf"&&prefs.persona==="std")));
       const n=document.createElement("b");n.textContent=p.name;const d=document.createElement("span");d.textContent=(src==="google"?p.g[0]:p.a[0][0].toUpperCase()+p.a[0].slice(1))+", "+(src==="google"?p.g[1]:p.a[1]);
       b.append(n,d);box.append(b)});
+    if(src==="cf"){const b=document.createElement("button");b.type="button";b.className="wide";b.dataset.v="std";b.setAttribute("aria-pressed",String(prefs.persona==="std"));
+      const n=document.createElement("b");n.textContent=STD.name;const d=document.createElement("span");d.textContent=STD.d+"; also reads Spanish and French";b.append(n,d);box.append(b)}
     return;
   }
   const sel=$("vSel");sel.textContent="";
@@ -1223,7 +1227,7 @@ function vStyleShow(){
   $("vStyleLbl").textContent=book?"Reading style for this book (optional)":"Reading style (used for books that have none of their own)";
   const t=$("vStyle");if(t&&document.activeElement!==t)t.value=vstyleOf(book);
 }
-function clVoice(){const p=personaOf();return srcOf()==="google"?"gemini:"+p.g[0]:(bookLang().code==="en"?"aura:"+p.a[0]:"melo")}
+function clVoice(){const p=personaOf();return srcOf()==="google"?"gemini:"+p.g[0]:(prefs.persona==="std"||bookLang().code!=="en"?"melo":"aura:"+p.a[0])}
 async function clFetch(text){
   const v=clVoice(),aura=v.startsWith("aura:"),gem=v.startsWith("gemini:"),code=(prefs.classCode||"").trim();
   const r=await fetch(relayAddr()+"/speech",{method:"POST",headers:{"content-type":"application/json",...(code?{"X-Class-Code":code}:{})},body:JSON.stringify({text,model:gem?"gemini":aura?"aura":"melo",voice:aura||gem?v.slice(v.indexOf(":")+1):undefined,lang:bookLang().code,style:gem?vstyleOf(book):undefined})});
@@ -1313,7 +1317,7 @@ async function voicePlay(){
   voiceLoop(tok,eng);
 }
 function baseStatus(eng){
-  return (eng==="cl"?(clVoice().startsWith("gemini:")?"Reading with a Google voice ("+personaOf().name.toLowerCase()+")":clVoice()==="melo"?"Reading with a plain Cloudflare voice ("+bookLang().name+")":"Reading with a Cloudflare voice ("+personaOf().name.toLowerCase()+")"):(V.clLangNote&&prefs.engine==="cloud"?V.clLangNote:V.clError&&prefs.engine==="cloud"?"The read-to-me voice is unavailable ("+V.clError+"). Using your browser's voice.":"Reading aloud with your browser's voice"));
+  return (eng==="cl"?(clVoice().startsWith("gemini:")?"Reading with a Google voice ("+personaOf().name.toLowerCase()+")":clVoice()==="melo"?"Reading with the Standard voice ("+bookLang().name+")":"Reading with a Cloudflare voice ("+personaOf().name.toLowerCase()+")"):(V.clLangNote&&prefs.engine==="cloud"?V.clLangNote:V.clError&&prefs.engine==="cloud"?"The read-to-me voice is unavailable ("+V.clError+"). Using your browser's voice.":"Reading aloud with your browser's voice"));
 }
 async function voiceLoop(tok,eng){
   while(tok===V.token&&V.playing){
