@@ -1,118 +1,134 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>AR Snow</title>
-    <style>
-        body { margin:0; overflow:hidden; }
-        canvas { display:block; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Snow Camera</title>
+
+<style>
+html,body{
+    margin:0;
+    overflow:hidden;
+    background:black;
+}
+
+video{
+    position:fixed;
+    inset:0;
+    width:100vw;
+    height:100vh;
+    object-fit:cover;
+}
+
+canvas{
+    position:fixed;
+    inset:0;
+    width:100vw;
+    height:100vh;
+    pointer-events:none;
+}
+
+#start{
+    position:fixed;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    padding:16px 24px;
+    font-size:18px;
+    border:none;
+    border-radius:12px;
+    z-index:10;
+}
+</style>
 </head>
 <body>
 
-<script type="module">
+<button id="start">Start Camera</button>
 
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-import { ARButton } from 'https://unpkg.com/three@0.160.0/examples/jsm/webxr/ARButton.js';
+<video id="video" autoplay playsinline muted></video>
+<canvas id="snow"></canvas>
 
-const scene = new THREE.Scene();
+<script>
 
-const camera = new THREE.PerspectiveCamera(
-    70,
-    window.innerWidth / window.innerHeight,
-    0.01,
-    100
-);
+const button = document.getElementById("start");
+const video = document.getElementById("video");
+const canvas = document.getElementById("snow");
+const ctx = canvas.getContext("2d");
 
-const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    alpha: true
-});
+let flakes = [];
 
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true;
-document.body.appendChild(renderer.domElement);
-
-document.body.appendChild(
-    ARButton.createButton(renderer, {
-        requiredFeatures: ['hit-test']
-    })
-);
-
-const light = new THREE.HemisphereLight(0xffffff, 0x444444, 3);
-scene.add(light);
-
-let snowflakes = [];
-
-const snowMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffffff
-});
-
-function createSnowflake() {
-
-    const geo = new THREE.SphereGeometry(0.015, 6, 6);
-
-    const flake = new THREE.Mesh(
-        geo,
-        snowMaterial
-    );
-
-    flake.position.set(
-        (Math.random() - 0.5) * 4,
-        2 + Math.random() * 2,
-        -Math.random() * 4
-    );
-
-    flake.velocity =
-        0.005 + Math.random() * 0.01;
-
-    scene.add(flake);
-    snowflakes.push(flake);
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 }
 
-const clock = new THREE.Clock();
+window.addEventListener("resize", resize);
+resize();
 
-function animate() {
+button.addEventListener("click", async () => {
 
-    renderer.setAnimationLoop(render);
-}
+    try {
 
-function render() {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: "environment"
+            }
+        });
 
-    if (Math.random() < 0.3) {
-        createSnowflake();
+        video.srcObject = stream;
+        button.style.display = "none";
+
+        createSnow();
+
+    } catch(err) {
+        alert("Camera access failed");
+        console.error(err);
     }
 
-    for (let i = snowflakes.length - 1; i >= 0; i--) {
+});
 
-        const flake = snowflakes[i];
+function createSnow() {
 
-        flake.position.y -= flake.velocity;
+    for(let i=0;i<250;i++){
 
-        flake.position.x +=
-            (Math.random() - 0.5) * 0.002;
+        flakes.push({
+            x: Math.random()*canvas.width,
+            y: Math.random()*canvas.height,
+            r: Math.random()*4+1,
+            speed: Math.random()*2+1,
+            drift: (Math.random()-0.5)*0.8
+        });
+    }
 
-        if (flake.position.y < 0) {
+    animate();
+}
 
-            const snowPile = new THREE.Mesh(
-                new THREE.SphereGeometry(0.02, 6, 6),
-                snowMaterial
-            );
+function animate(){
 
-            snowPile.position.copy(flake.position);
-            snowPile.position.y = 0;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-            scene.add(snowPile);
+    for(let flake of flakes){
 
-            scene.remove(flake);
-            snowflakes.splice(i, 1);
+        flake.y += flake.speed;
+        flake.x += flake.drift;
+
+        if(flake.y > canvas.height){
+
+            flake.y = -10;
+            flake.x = Math.random()*canvas.width;
         }
+
+        if(flake.x < 0) flake.x = canvas.width;
+        if(flake.x > canvas.width) flake.x = 0;
+
+        ctx.beginPath();
+        ctx.arc(flake.x,flake.y,flake.r,0,Math.PI*2);
+        ctx.fillStyle = "white";
+        ctx.fill();
     }
 
-    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
 }
-
-animate();
 
 </script>
 
