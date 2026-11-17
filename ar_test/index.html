@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>AR Snow</title>
+    <style>
+        body { margin:0; overflow:hidden; }
+        canvas { display:block; }
+    </style>
+</head>
+<body>
+
+<script type="module">
+
+import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import { ARButton } from 'https://unpkg.com/three@0.160.0/examples/jsm/webxr/ARButton.js';
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+    70,
+    window.innerWidth / window.innerHeight,
+    0.01,
+    100
+);
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true
+});
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+document.body.appendChild(
+    ARButton.createButton(renderer, {
+        requiredFeatures: ['hit-test']
+    })
+);
+
+const light = new THREE.HemisphereLight(0xffffff, 0x444444, 3);
+scene.add(light);
+
+let snowflakes = [];
+
+const snowMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffffff
+});
+
+function createSnowflake() {
+
+    const geo = new THREE.SphereGeometry(0.015, 6, 6);
+
+    const flake = new THREE.Mesh(
+        geo,
+        snowMaterial
+    );
+
+    flake.position.set(
+        (Math.random() - 0.5) * 4,
+        2 + Math.random() * 2,
+        -Math.random() * 4
+    );
+
+    flake.velocity =
+        0.005 + Math.random() * 0.01;
+
+    scene.add(flake);
+    snowflakes.push(flake);
+}
+
+const clock = new THREE.Clock();
+
+function animate() {
+
+    renderer.setAnimationLoop(render);
+}
+
+function render() {
+
+    if (Math.random() < 0.3) {
+        createSnowflake();
+    }
+
+    for (let i = snowflakes.length - 1; i >= 0; i--) {
+
+        const flake = snowflakes[i];
+
+        flake.position.y -= flake.velocity;
+
+        flake.position.x +=
+            (Math.random() - 0.5) * 0.002;
+
+        if (flake.position.y < 0) {
+
+            const snowPile = new THREE.Mesh(
+                new THREE.SphereGeometry(0.02, 6, 6),
+                snowMaterial
+            );
+
+            snowPile.position.copy(flake.position);
+            snowPile.position.y = 0;
+
+            scene.add(snowPile);
+
+            scene.remove(flake);
+            snowflakes.splice(i, 1);
+        }
+    }
+
+    renderer.render(scene, camera);
+}
+
+animate();
+
+</script>
+
+</body>
+</html>
