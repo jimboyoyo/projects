@@ -87,6 +87,26 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 }
 .lb{position:fixed;inset:0;z-index:50;background:rgba(10,14,18,.62);display:flex;align-items:center;justify-content:center;padding:16px}
 .lb[hidden]{display:none}
+.wlbtns{display:flex;gap:8px;flex-wrap:wrap}
+.qz{width:min(520px,100%)}
+.qzh{display:flex;align-items:center;gap:10px;padding:12px 14px 10px}.qzh b{flex:1;font-size:1rem}.qzh span{color:var(--muted);font-size:.85rem}
+.qzbar{height:4px;background:var(--line);margin:0 14px;border-radius:2px;overflow:hidden}.qzbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
+.qzb{padding:16px 14px 16px;overflow:auto;display:grid;gap:12px}
+.qzq{font-size:.82rem;color:var(--muted);letter-spacing:.02em}
+.qzw{font-family:var(--font-read,Georgia,serif);font-size:1.7rem;line-height:1.25;overflow-wrap:anywhere}
+.qzd{font-size:1.15rem;line-height:1.4}
+.qzo{display:grid;gap:8px}
+.qzc{display:flex;gap:10px;align-items:baseline;text-align:left;width:100%;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:11px 12px;font:inherit;font-size:.98rem;line-height:1.3;cursor:pointer}
+.qzc kbd{font:inherit;font-size:.75rem;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;flex:none}
+.qzc:hover:not(:disabled){border-color:var(--accent)}
+.qzc:disabled{cursor:default;opacity:1}
+.qzc.ok{background:color-mix(in srgb,#2e9e5b 22%,transparent);border-color:#2e9e5b}
+.qzc.bad{background:color-mix(in srgb,#c2412d 20%,transparent);border-color:#c2412d}
+.qzc.dim{opacity:.55}
+.qzf{min-height:1.4em;font-size:.92rem}.qzf.ok{color:#2e7d4f}.qzf.bad{color:#b3402f}
+.qzbtns{display:flex;gap:8px;flex-wrap:wrap}
+.qzbig{font-size:2.2rem;font-weight:600;line-height:1}
+.qzl{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:.92rem}.qzl b{font-weight:600}
 .lbc{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;width:min(860px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.4);font-family:var(--font-ui)}
 .lbh{display:flex;gap:8px;padding:12px;border-bottom:1px solid var(--line);align-items:center}
 .lbh form{display:flex;gap:6px;flex:1;min-width:0}
@@ -393,7 +413,7 @@ html.reading{overflow:hidden}
 </main>
 
 <div class="scrim" id="scrim" hidden></div>
-<nav class="drawer" id="drawer" hidden aria-label="Contents"><h3>Contents</h3><a id="srcLink" target="_blank" rel="noopener noreferrer" hidden>Open the original page ↗</a><ul class="toc" id="toc"></ul><h3 id="wlH" style="margin-top:18px" hidden>Wordlist</h3><button class="btn" id="wlCopy" type="button" hidden>Copy list</button><ul class="notes" id="wls"></ul><h3 id="plH" style="margin-top:18px" hidden>Pictures</h3><ul class="notes pics" id="pls"></ul><h3 id="bmH" style="margin-top:18px" hidden>Bookmarks</h3><ul class="notes" id="bms"></ul><h3 id="notesH" style="margin-top:18px" hidden>Margin notes</h3><ul class="notes" id="notes"></ul></nav>
+<nav class="drawer" id="drawer" hidden aria-label="Contents"><h3>Contents</h3><a id="srcLink" target="_blank" rel="noopener noreferrer" hidden>Open the original page ↗</a><ul class="toc" id="toc"></ul><h3 id="wlH" style="margin-top:18px" hidden>Wordlist</h3><span class="wlbtns"><button class="btn" id="wlPractice" type="button" hidden>Practice</button><button class="btn" id="wlCopy" type="button" hidden>Copy list</button></span><ul class="notes" id="wls"></ul><h3 id="plH" style="margin-top:18px" hidden>Pictures</h3><ul class="notes pics" id="pls"></ul><h3 id="bmH" style="margin-top:18px" hidden>Bookmarks</h3><ul class="notes" id="bms"></ul><h3 id="notesH" style="margin-top:18px" hidden>Margin notes</h3><ul class="notes" id="notes"></ul></nav>
 <aside class="sheet" id="sheet" hidden aria-label="Reading settings">
   <section class="aa">
   <h3>Reading</h3>
@@ -473,6 +493,11 @@ html.reading{overflow:hidden}
   <div class="lbg" id="imgGrid"></div>
   <div class="lbbig" id="imgBig" hidden><button class="btn" id="imgBack" type="button">← Back to results</button><img id="imgBigImg" alt=""><p id="imgCap"></p><a id="imgSrc" target="_blank" rel="noopener noreferrer">Open the source page ↗</a></div>
   <div class="lbf"><a id="imgG" target="_blank" rel="noopener noreferrer">Search Google Images ↗</a><label><input type="checkbox" id="imgT"> Add the book title to the Google search</label><span id="imgFrom"></span></div>
+</div></div>
+<div class="lb" id="qzBox" hidden role="dialog" aria-modal="true" aria-label="Word practice"><div class="lbc qz">
+  <div class="qzh"><b>Word practice</b><span id="qzCount" aria-live="polite"></span><button class="btn" id="qzX" type="button" aria-label="Close">×</button></div>
+  <div class="qzbar"><i id="qzBar"></i></div>
+  <div class="qzb" id="qzBody"></div>
 </div></div>
 <div id="wlTip" role="tooltip" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
@@ -1005,7 +1030,7 @@ stage.addEventListener("touchend",e=>{if(tx0==null)return;const dx=e.changedTouc
 // after a mouse or touch click, hand the keyboard back to the page so Space and the arrow keys control reading
 document.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("button");if(b&&e.detail>0)b.blur()});
 addEventListener("keydown",e=>{
-  if(!$("imgBox").hidden||!$("prBox").hidden)return;
+  if(!$("imgBox").hidden||!$("prBox").hidden||!$("qzBox").hidden)return;
   const tag=(e.target||{}).tagName||"";
   if($("reader").hidden||/INPUT|SELECT|TEXTAREA/.test(tag)||e.metaKey||e.ctrlKey||e.altKey)return;
   if(e.key===" "&&tag==="BUTTON")return;                 // space on a focused button presses it
@@ -2451,7 +2476,7 @@ function renderWordlist(){
   const ul=$("wls");ul.textContent="";const all=wordsOf().filter(x=>x.def),seen=new Set(),first=all.slice().sort((a,b)=>a.c-b.c||a.a0.s0-b.a0.s0);
   const rows=[];first.forEach(x=>{const k=x.w.toLowerCase();if(!seen.has(k)){seen.add(k);rows.push(x)}});
   rows.sort((a,b)=>a.w.toLowerCase().localeCompare(b.w.toLowerCase()));
-  $("wlH").hidden=!rows.length;$("wlCopy").hidden=!rows.length;
+  $("wlH").hidden=!rows.length;$("wlCopy").hidden=!rows.length;$("wlPractice").hidden=!rows.length;
   rows.forEach(x=>{
     const li=document.createElement("li"),go=document.createElement("button");go.type="button";go.className="go";
     const q=document.createElement("span");q.className="nq";q.textContent=x.w;
@@ -2465,6 +2490,81 @@ function renderWordlist(){
     li.append(go,d);ul.append(li);
   });
 }
+/* word practice: a short match game on the wordlist (what does the word mean, which word means this) */
+const QZ={queue:[],total:0,done:0,first:0,missed:new Map(),answered:false,pool:[],dirty:false,stats:null,ok:false};
+function qzShuf(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function qzMine(){const m=new Map();wordsOf().filter(x=>x.def).sort((a,b)=>a.c-b.c||a.a0.s0-b.a0.s0).forEach(x=>{const k=x.w.toLowerCase();if(!m.has(k))m.set(k,{k,w:x.w,def:x.def})});return[...m.values()]}
+function qzEl(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+async function qzOpen(){
+  if(!book)return;closeAll();
+  const mine=qzMine(),m=new Map();mine.forEach(x=>m.set(x.k,x));
+  try{(await allBooks()).forEach(b=>(b.words||[]).forEach(x=>{if(!x||!x.def||!x.w)return;const k=String(x.w).toLowerCase();if(!m.has(k))m.set(k,{k,w:x.w,def:x.def})}))}catch(e){}   // words from other books make good wrong answers
+  QZ.pool=[...m.values()];QZ.stats=book.wstats=book.wstats||{};QZ.dirty=false;
+  $("qzBox").hidden=false;
+  if(QZ.pool.length<4){qzNote("Not enough words yet","Practice needs at least 4 words in your wordlists. You have "+QZ.pool.length+". Select a word while reading and choose Add to wordlist.");return}
+  qzStart(mine);
+}
+function qzNote(title,text){
+  $("qzBar").style.width="0";$("qzCount").textContent="";const b=$("qzBody");b.textContent="";
+  const x=qzEl("button","btn","Close");x.type="button";x.onclick=qzClose;
+  b.append(qzEl("div","qzw",title),qzEl("p","qzd",text),x);x.focus();
+}
+function qzStart(list){
+  const st=QZ.stats,sc=w=>(st[w.k]&&st[w.k].n?st[w.k].ok/st[w.k].n:-1)+Math.random()*.4;   // new and shaky words come first
+  const pick=qzShuf(list.slice().sort((a,b)=>sc(a)-sc(b)).slice(0,10));
+  QZ.queue=pick.map(w=>qzMake(w,false));QZ.total=pick.length;QZ.done=0;QZ.first=0;QZ.missed=new Map();
+  qzShow();
+}
+function qzMake(w,retry){
+  const dir=Math.random()<.5?"w2d":"d2w",seen=new Set([w.k,w.def.toLowerCase()]),opts=[w];
+  for(const x of qzShuf(QZ.pool)){if(opts.length>=4)break;const d=x.def.toLowerCase();if(seen.has(x.k)||seen.has(d))continue;seen.add(x.k);seen.add(d);opts.push(x)}
+  return{w,dir,retry,opts:qzShuf(opts)};
+}
+function qzShow(){
+  const q=QZ.queue[0];if(!q){qzFinish();return}
+  QZ.answered=false;
+  $("qzCount").textContent=Math.min(QZ.done+1,QZ.total)+" of "+QZ.total;$("qzBar").style.width=Math.round(QZ.done/QZ.total*100)+"%";
+  const b=$("qzBody");b.textContent="";
+  b.append(qzEl("div","qzq",q.dir==="w2d"?"What does this word mean?":"Which word means this?"),q.dir==="w2d"?qzEl("div","qzw",q.w.w):qzEl("div","qzd",q.w.def));
+  const o=qzEl("div","qzo");o.setAttribute("role","group");
+  q.opts.forEach((x,i)=>{const c=qzEl("button","qzc");c.type="button";c.dataset.k=x.k;c.append(qzEl("kbd","",String(i+1)),qzEl("span","",q.dir==="w2d"?x.def:x.w));c.onclick=()=>qzPick(x);o.append(c)});
+  const f=qzEl("div","qzf");f.id="qzF";f.setAttribute("role","status");
+  const nx=qzEl("button","btn","Next");nx.type="button";nx.id="qzNext";nx.style.visibility="hidden";nx.onclick=qzNext;
+  b.append(o,f,nx);o.firstChild.focus();
+}
+function qzPick(x){
+  if(QZ.answered)return;QZ.answered=true;
+  const q=QZ.queue[0],right=x.k===q.w.k;
+  document.querySelectorAll("#qzBody .qzc").forEach(c=>{c.disabled=true;if(c.dataset.k===q.w.k)c.classList.add("ok");else if(c.dataset.k===x.k)c.classList.add("bad");else c.classList.add("dim")});
+  if(!q.retry){const s=QZ.stats[q.w.k]||(QZ.stats[q.w.k]={n:0,ok:0});s.n++;if(right){s.ok++;QZ.first++}QZ.dirty=true}
+  if(!right)QZ.missed.set(q.w.k,q.w);
+  const f=$("qzF");f.className="qzf "+(right?"ok":"bad");
+  f.textContent=right?["Correct.","Yes.","Got it.","Right."][Math.floor(Math.random()*4)]:"Not quite. \u201c"+q.w.w+"\u201d means: "+q.w.def;
+  q.right=right;const nx=$("qzNext");nx.style.visibility="visible";nx.focus();
+}
+function qzNext(){
+  const q=QZ.queue.shift();
+  if(q.right)QZ.done++;else QZ.queue.splice(Math.min(2,QZ.queue.length),0,qzMake(q.w,true));   // a missed word comes back after a couple of others
+  qzShow();
+}
+function qzSave(){if(QZ.dirty&&book){QZ.dirty=false;putBook(book)}}
+function qzFinish(){
+  qzSave();$("qzBar").style.width="100%";$("qzCount").textContent="Done";
+  const b=$("qzBody");b.textContent="";const miss=[...QZ.missed.values()];
+  b.append(qzEl("div","qzq","First try"),qzEl("div","qzbig",QZ.first+" of "+QZ.total));
+  if(miss.length){b.append(qzEl("div","qzq","Words to look at again"));const ul=qzEl("ul","qzl");miss.forEach(w=>{const li=document.createElement("li");li.append(qzEl("b","",w.w),document.createTextNode(" \u2014 "+w.def));ul.append(li)});b.append(ul)}
+  else b.append(qzEl("p","qzd","No misses. Nice."));
+  const r=qzEl("div","qzbtns"),again=qzEl("button","btn","Play again");again.type="button";again.onclick=()=>qzStart(qzMine());r.append(again);
+  if(miss.length){const m=qzEl("button","btn","Only the missed words");m.type="button";m.onclick=()=>{const l=miss.slice();QZ.missed=new Map();QZ.queue=qzShuf(l).map(w=>qzMake(w,false));QZ.total=l.length;QZ.done=0;QZ.first=0;qzShow()};r.append(m)}
+  const x=qzEl("button","btn","Close");x.type="button";x.onclick=qzClose;r.append(x);b.append(r);again.focus();
+}
+function qzClose(){qzSave();$("qzBox").hidden=true;$("qzBody").textContent=""}
+$("wlPractice").onclick=qzOpen;$("qzX").onclick=qzClose;
+$("qzBox").addEventListener("mousedown",e=>{if(e.target===$("qzBox"))qzClose()});
+$("qzBox").addEventListener("keydown",e=>{
+  if(e.key==="Escape"){e.preventDefault();e.stopPropagation();qzClose();return}
+  if(/^[1-4]$/.test(e.key)&&!QZ.answered&&QZ.queue[0]){const o=QZ.queue[0].opts[+e.key-1];if(o){e.preventDefault();qzPick(o)}}
+});
 $("wlCopy").onclick=()=>{
   const lines=[...$("wls").querySelectorAll("li")].map(li=>li.querySelector(".nq").textContent+" — "+li.querySelector(".na").textContent);
   try{navigator.clipboard.writeText(lines.join("\n"))}catch(e){}
