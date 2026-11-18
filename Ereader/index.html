@@ -1375,7 +1375,7 @@ function vStyleShow(){
 }
 function clVoice(){const p=personaOf();return srcOf()==="google"?"gemini:"+p.g[0]:(prefs.persona==="std"||bookLang().code!=="en"?"melo":"aura:"+p.a[0])}
 async function clFetch(text){
-  const v=clVoice(),aura=v.startsWith("aura:"),gem=v.startsWith("gemini:"),code=(prefs.classCode||"").trim();
+  const v=clVoice(),aura=v.startsWith("aura:"),gem=v.startsWith("gemini:"),code=classCode();
   const r=await fetch(relayAddr()+"/speech",{method:"POST",headers:{"content-type":"application/json",...(code?{"X-Class-Code":code}:{})},body:JSON.stringify({text,model:gem?"gemini":aura?"aura":"melo",voice:aura||gem?v.slice(v.indexOf(":")+1):undefined,lang:bookLang().code,style:gem?vstyleOf(book):undefined})});
   if(!r.ok){let m="";try{m=(await r.json()).error||""}catch(e){}const err=new Error(m||("HTTP "+r.status));err.status=r.status;throw err}
   const ab=await r.arrayBuffer();ensureCtx();if(!AC.ctx)throw new Error("Audio is not available in this browser.");
@@ -1670,7 +1670,16 @@ const hasSel=()=>{const g=getSelection();return !!(g&&!g.isCollapsed&&g.toString
 const getKey=()=>store.get("marginalia.apikey","");
 /* Claude through the relay: when the relay holds a key, readers need none of their own */
 const RA={enabled:false,needsCode:false};Object.assign(RA,store.get("marginalia.relayai",{}));
-const hasAI=()=>!!getKey()||(RA.enabled&&(!RA.needsCode||!!(prefs.classCode||"").trim()));
+/* The class code. The saved copy can fall behind what the box shows: browsers and password managers fill a box (or restore it when a tab
+   comes back) without telling the page. So the box is read at the moment the code is used, and the saved copy is brought in line. */
+function classCode(){
+  const clean=v=>String(v||"").replace(/[\u200B-\u200D\u2060\uFEFF]/g,"").trim();
+  const box=$("sCode"),typed=box?clean(box.value):"",saved=clean(prefs.classCode);
+  if(typed&&typed!==saved){prefs.classCode=typed;store.set("marginalia.prefs",prefs)}
+  else if(!typed&&saved&&box&&document.activeElement!==box){box.value=saved}
+  return typed||saved;
+}
+const hasAI=()=>!!getKey()||(RA.enabled&&(!RA.needsCode||!!classCode()));
 const needMsg=orig=>RA.enabled&&RA.needsCode?"Type the class code in the Aa panel, under Lookup. You can also paste your own Anthropic key there.":orig;
 async function refreshRelayAI(){
   if(!relayAddr()){RA.enabled=false;RA.needsCode=false;SP.gemini=false;SP.needsCode=false;store.set("marginalia.relayai",{enabled:false,needsCode:false});store.set("marginalia.speechinfo",{gemini:false,needsCode:false});keyNote();fillVoiceSelect();return}
@@ -1819,7 +1828,7 @@ function cachePut(k,v){const m=store.get("marginalia.lk",{});delete m[k];m[k]=v;
 const SA={stop:"",blocks:[]};          // what the last answer looked like, for error messages
 async function streamAnswer(payload,onText,signal){
   SA.stop="";SA.blocks=[];
-  const viaRelay=!getKey()&&RA.enabled,code=(prefs.classCode||"").trim();
+  const viaRelay=!getKey()&&RA.enabled,code=classCode();
   const send=think=>fetch(viaRelay?relayAddr()+"/claude":API_URL,{method:"POST",signal,headers:viaRelay?{"content-type":"application/json",...(code?{"X-Class-Code":code}:{})}:{"content-type":"application/json","x-api-key":getKey(),"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
     body:JSON.stringify({model:prefs.model||"claude-haiku-5-5",max_tokens:(payload.max||450)+(think?0:3000),stream:true,system:payload.system,messages:payload.messages||[{role:"user",content:payload.user}],...(think?{thinking:{type:"disabled"}}:{})})});
   // Thinking is switched off: otherwise the model can spend the whole token allowance thinking and send no text at all.
@@ -1856,7 +1865,7 @@ const MODES={
 };
 function friendly(err){
   if(err.name==="AbortError")return null;
-  if(err.relay&&err.status===401)return "The class code is missing or wrong. Type it in the Aa panel, under Lookup.";
+  if(err.relay&&err.status===401)return classCode()?"The relay did not accept the class code. Check it for typing mistakes (Aa panel, under Lookup).":"No class code was sent. Type it in the Aa panel, under Lookup.";
   if(err.relay&&err.status>=500)return err.message;
   if(err.status===401)return "The API key was not accepted. Check it in the Aa panel under Lookup.";
   if(err.status===403)return "This key is not allowed to use that model. "+err.message;
@@ -2714,7 +2723,7 @@ function renderNotes(){
 const MODE_NAME={ask:"Ask",define:"Define",explain:"Explain",simplify:"Simplify",analysis:"Analysis"};
 function keyNote(){
   const row=$("sCodeRow");if(row)row.hidden=!((RA.enabled&&RA.needsCode)||(SP.gemini&&SP.needsCode));
-  $("keyNote").textContent=getKey()?"A key is saved in this browser. It is used instead of the relay's.":(RA.enabled?"Your relay provides Claude, so you do not need a key"+(RA.needsCode?((prefs.classCode||"").trim()?" (class code saved).":". Type the class code above."):"."):"No key saved yet.");
+  $("keyNote").textContent=getKey()?"A key is saved in this browser. It is used instead of the relay's.":(RA.enabled?"Your relay provides Claude, so you do not need a key"+(RA.needsCode?(classCode()?" (class code saved).":". Type the class code above."):"."):"No key saved yet.");
 }
 $("sKeySave").onclick=()=>{if(saveKey($("sKey").value))$("sKey").value=""};
 $("sKeyClear").onclick=()=>{store.set("marginalia.apikey","");$("sKey").value="";keyNote()};
@@ -2726,7 +2735,11 @@ langUI();
 $("sModel").value=prefs.model;$("sModel").onchange=()=>{prefs.model=$("sModel").value.trim()||"claude-haiku-5-5";$("sModel").value=prefs.model;store.set("marginalia.prefs",prefs)};
 $("sKey").addEventListener("keydown",e=>e.stopPropagation());
 $("sCode").value=prefs.classCode||"";$("sCode").addEventListener("keydown",e=>e.stopPropagation());
-$("sCode").oninput=()=>{prefs.classCode=$("sCode").value.trim();store.set("marginalia.prefs",prefs);keyNote()};
+$("sCode").oninput=()=>{classCode();keyNote()};
+["change","blur","focus","paste"].forEach(ev=>$("sCode").addEventListener(ev,()=>setTimeout(()=>{classCode();keyNote()},0)));
+addEventListener("pageshow",()=>{classCode();keyNote()});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){classCode();keyNote()}});
+setTimeout(()=>{classCode();keyNote()},600);setTimeout(()=>{classCode();keyNote()},2500);   // late autofill
 keyNote();refreshRelayAI();
 addEventListener("resize",()=>bubClose());
 function closeAll(){$("drawer").hidden=true;$("sheet").hidden=true;$("scrim").hidden=true}
