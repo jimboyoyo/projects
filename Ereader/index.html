@@ -672,7 +672,10 @@ function asUrl(v){
   if(/^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(\/\S*)?$/i.test(v))return "https://"+v;
   return null;
 }
-const relayAddr=()=>(store.get("marginalia.relay","")||"").trim().replace(/[?#].*$/,"").replace(/\/+$/,"");
+/* The relay address your class uses. Put it between the quotes and students only need to type the class code.
+   Leave it empty and each reader pastes the address themselves (Aa panel / Web links). An address a reader saved overrides this one. */
+const DEFAULT_RELAY="https://marginalia-relay.jimbernstrom.workers.dev";
+const relayAddr=()=>((store.get("marginalia.relay","")||"").trim()||DEFAULT_RELAY).trim().replace(/[?#].*$/,"").replace(/\/+$/,"");
 async function relayFetch(u,ms){
   const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),ms||25000);
   try{return await fetch(relayAddr()+"/?url="+encodeURIComponent(u),{signal:ctl.signal})}
