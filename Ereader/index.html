@@ -87,7 +87,7 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 }
 .lb{position:fixed;inset:0;z-index:50;background:rgba(10,14,18,.62);display:flex;align-items:center;justify-content:center;padding:16px}
 .lb[hidden]{display:none}
-#feed{position:absolute;top:0;bottom:0;left:0;right:0;margin:0 auto;width:min(100%,760px);z-index:5;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scroll-snap-type:y mandatory;scrollbar-width:none;user-select:text;-webkit-user-select:text;outline:none;background:var(--bg)}
+#feed{position:absolute;top:0;bottom:0;left:0;right:0;margin:0 auto;width:min(100%,760px);z-index:5;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scroll-snap-type:y mandatory;scrollbar-width:none;user-select:text;-webkit-user-select:text;outline:none;background:transparent}
 #feed::-webkit-scrollbar{display:none}
 .fc{height:100%;box-sizing:border-box;scroll-snap-align:start;scroll-snap-stop:always;display:flex;align-items:center;justify-content:center;padding:26px 30px 56px;position:relative}
 .fc .ft{width:100%;max-width:34em;font-family:var(--read);font-size:calc(var(--size)*var(--fs,1.5));line-height:1.38;white-space:pre-line;overflow-wrap:anywhere;hyphens:auto;border-left:3px solid transparent;padding-left:14px;margin-left:-17px;transition:border-color .2s}
@@ -102,6 +102,7 @@ mark.wl[data-n]::after{content:attr(data-n);font-family:var(--font-ui);font-size
 #feed.nohl .fc.speak .ft{border-left-color:transparent}
 #feedHud{position:absolute;left:0;right:0;bottom:0;margin:0 auto;width:min(100%,760px);z-index:6;display:flex;justify-content:space-between;gap:12px;padding:0 30px 14px;font:.74rem var(--font-ui);color:var(--muted);pointer-events:none}
 #feedHud span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#feedBg{position:absolute;inset:0;z-index:1;background-size:cover;background-position:center;opacity:.14;pointer-events:none;transition:opacity .3s}
 #stage.feedmode #paper,#stage.feedmode #stackL,#stage.feedmode #stackR,#stage.feedmode #shitL,#stage.feedmode #shitR,#stage.feedmode #tabs,#stage.feedmode #ribbon{visibility:hidden;pointer-events:none}
 .wlbtns{display:flex;gap:8px;flex-wrap:wrap}
 .qz{width:min(520px,100%)}
@@ -407,7 +408,7 @@ html.reading{overflow:hidden}
 </section>
 
 <section class="reader" id="reader" hidden>
-  <div id="stage"><div id="feed" hidden role="region" aria-label="Sentences, one at a time" tabindex="-1"></div><div id="feedHud" hidden aria-hidden="true"><span id="fhL"></span><span id="fhR"></span></div><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="lfBar" hidden></div><div id="lfExt"></div><div id="flow"></div><div id="lfDim" hidden></div></div><div id="ribbon" hidden></div><div id="tabs"></div><div class="stack" id="stackL"></div><div class="stack" id="stackR"></div><div class="shit" id="shitL" aria-label="Pages already read: hover to see where, click to go there" role="button"></div><div class="shit" id="shitR" aria-label="Pages still to read: hover to see where, click to go there" role="button"></div><div id="stackTip" hidden></div><div id="fnBand" hidden></div></div></div>
+  <div id="stage"><div id="feedBg" hidden></div><div id="feed" hidden role="region" aria-label="Sentences, one at a time" tabindex="-1"></div><div id="feedHud" hidden aria-hidden="true"><span id="fhL"></span><span id="fhR"></span></div><div id="paper"><div id="leaves"><div class="leaf"><span class="pn"></span></div><div class="leaf"><span class="pn"></span></div></div><div id="view"><div id="lfBar" hidden></div><div id="lfExt"></div><div id="flow"></div><div id="lfDim" hidden></div></div><div id="ribbon" hidden></div><div id="tabs"></div><div class="stack" id="stackL"></div><div class="stack" id="stackR"></div><div class="shit" id="shitL" aria-label="Pages already read: hover to see where, click to go there" role="button"></div><div class="shit" id="shitR" aria-label="Pages still to read: hover to see where, click to go there" role="button"></div><div id="stackTip" hidden></div><div id="fnBand" hidden></div></div></div>
   <div id="foot">
   <div class="prog" id="prog">
     <button class="btn" id="prev" type="button" aria-label="Previous page">&#8249;</button>
@@ -453,6 +454,7 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Columns per page</label><div class="seg" id="sCols"><button data-v="1" type="button">1</button><button data-v="2" type="button">2</button><button data-v="3" type="button">3</button></div></div>
   <p class="note" id="layNote"></p>
   <p class="note" id="modeNote" hidden>Doomscroll shows one sentence at a time. Scroll, swipe, or use the arrow keys, Space and the buttons below. Select a word to look it up or pin it, and Listen follows along.</p>
+  <div class="ctl" id="feedBgRow" hidden><label>Picture behind the text</label><div class="seg" id="sFeedBg"><button data-v="false" type="button">Off</button><button data-v="true" type="button">On</button></div></div>
   </section>
   <section class="aa">
   <h3>Illustrations</h3>
@@ -1043,13 +1045,22 @@ function feedResize(){
   const box=$("feed");FEED.H=box.clientHeight;[...FEED.filled].forEach(i=>feedUnfill(i));feedNear(FEED.idx);
   box.scrollTo({top:FEED.idx*FEED.H,behavior:"instant"});
 }
+let feedBgUrl=null;
+function lastPlate(bk){return bk&&(bk.plates||[]).filter(p=>p.blob).sort((a,b)=>(b.t||0)-(a.t||0))[0]}
+function feedBgSync(){
+  const el=$("feedBg");if(!el)return;
+  const p=prefs.feedBg&&FEED.on?lastPlate(book):null;
+  if(!p){if(feedBgUrl){URL.revokeObjectURL(feedBgUrl);feedBgUrl=null}el.hidden=true;el.style.backgroundImage="";return}
+  if(feedBgUrl)URL.revokeObjectURL(feedBgUrl);
+  feedBgUrl=URL.createObjectURL(p.blob);el.style.backgroundImage="url("+feedBgUrl+")";el.hidden=false;
+}
 function feedShow(on){
-  $("stage").classList.toggle("feedmode",on);$("feed").hidden=!on;$("feedHud").hidden=!on;$("lineBtn").hidden=on||!book;
-  $("sSpread").closest(".ctl").hidden=on;$("sFlip").closest(".ctl").hidden=on;$("sCols").closest(".ctl").hidden=on;$("layNote").hidden=on;$("modeNote").hidden=!on;
+  $("stage").classList.toggle("feedmode",on);feedBgSync();$("feed").hidden=!on;$("feedHud").hidden=!on;$("lineBtn").hidden=on||!book;
+  $("sSpread").closest(".ctl").hidden=on;$("sFlip").closest(".ctl").hidden=on;$("sCols").closest(".ctl").hidden=on;$("layNote").hidden=on;$("modeNote").hidden=!on;$("feedBgRow").hidden=!on;
 }
 function feedEnsure(frac){     // a chapter was just laid out: build the feed for it, or leave feed mode
   if(!feedWant()){if(FEED.on)feedSync();return}
-  FEED.on=true;feedShow(true);lfSet(false,true);feedBuild();
+  FEED.on=true;feedShow(true);lfSet(false,true);feedBuild();feedBgSync();
   const n=V.sents.length;feedGo(frac==="last"?n-1:Math.floor((frac||0)*n+1e-6),true);
 }
 function feedSync(){       // the layout setting changed, or the window was resized
@@ -1261,7 +1272,7 @@ let rt=null;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(relayo
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>setTimeout(relayout,50));
 $("home").onclick=async()=>{flipCancel();if(book)await putBook(book);bubClose();lfSet(false,true,true);$("lineBtn").hidden=true;$("bmBtn").hidden=true;$("printBtn").hidden=true;$("plateBtn").hidden=true;$("ribbon").hidden=true;$("fnBand").hidden=true;book=null;voiceStop("");wordsClear();V.open=false;flow.classList.remove("vmode");$("voice").hidden=true;$("listenBtn").setAttribute("aria-pressed","false");$("listenBtn").hidden=true;V.cur=null;closeAll();$("reader").hidden=true;$("tline").hidden=true;$("tocBtn").hidden=true;document.documentElement.classList.remove("reading");$("lib").hidden=false;scrollTo(0,0);renderShelf()};
 
-const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"cloud",fastSrc:"",persona:"yw",mode:"pages",flip:true,brVoice:"",speed:1,highlight:true,wordHl:true,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,lfExt:0,claudeLang:"auto",claudeLangOther:"",v:3},store.get("marginalia.prefs",{}));
+const prefs=Object.assign({size:20,font:"serif",measure:34,lh:1.65,theme:"auto",spread:innerWidth>=1100,cols:1,engine:"cloud",fastSrc:"",persona:"yw",mode:"pages",feedBg:true,flip:true,brVoice:"",speed:1,highlight:true,wordHl:true,model:"claude-haiku-5-5",lineFocus:false,lfColor:"yellow",lfDim:false,lfExt:0,claudeLang:"auto",claudeLangOther:"",v:3},store.get("marginalia.prefs",{}));
 if((prefs.v||0)<3){   // the Natural (in-browser) voice is gone; carry old choices over to the new narrators
   if(prefs.engine==="natural")prefs.engine="cloud";
   const cv=String(prefs.cloudVoice||"");if(cv.startsWith("gemini:"))prefs.fastSrc="google";else if(cv)prefs.fastSrc="cf";
@@ -2453,7 +2464,7 @@ async function makePlate(redo){
       const hit=await sharedGet(skey,ctl.signal);
       if(hit){
         const p={id:Date.now(),c,after,cap:hit.cap||"",prompt:hit.prompt||"",text,before,model:hit.model||"",shared:true,blob:hit.blob,t:Date.now()};
-        (bk.plates||(bk.plates=[])).push(p);await putBook(bk);$("toast").hidden=true;
+        (bk.plates||(bk.plates=[])).push(p);await putBook(bk);$("toast").hidden=true;feedBgSync();
         if(book===bk&&book.pos.c===c){placePlate(p);relayout()}
         toast("This picture was made earlier and is shared with your class.",4000);return;
       }
@@ -2500,7 +2511,7 @@ async function makePlate(redo){
   }finally{PL.busy=false;PL.ctl=null;$("plateBtn").classList.remove("busy")}
 }
 function removePlate(p){
-  book.plates=(book.plates||[]).filter(x=>x.id!==p.id);
+  book.plates=(book.plates||[]).filter(x=>x.id!==p.id);feedBgSync();
   if(PL.urls.has(p.id)){URL.revokeObjectURL(PL.urls.get(p.id));PL.urls.delete(p.id)}
   unplace(p);putBook(book);relayout();
 }
@@ -2828,16 +2839,16 @@ function applyPrefs(){
   r.setProperty("--size",prefs.size+"px");r.setProperty("--measure",prefs.measure+"em");r.setProperty("--lh",prefs.lh);
   r.setProperty("--read",prefs.font==="sans"?"var(--font-ui)":"var(--font-read)");
   if(prefs.theme==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",prefs.theme);
-  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sWh","wordHl"],["sMode","mode"],["sSpread","spread"],["sFlip","flip"],["sCols","cols"],["sLfc","lfColor"],["sLfd","lfDim"],["sLfx","lfExt"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
+  [["sFont","font"],["sMeasure","measure"],["sLh","lh"],["sTheme","theme"],["sEngine","engine"],["sSpeed","speed"],["sHl","highlight"],["sWh","wordHl"],["sMode","mode"],["sFeedBg","feedBg"],["sSpread","spread"],["sFlip","flip"],["sCols","cols"],["sLfc","lfColor"],["sLfd","lfDim"],["sLfx","lfExt"]].forEach(([id,k])=>$(id).querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v)===String(prefs[k]))));
   store.set("marginalia.prefs",prefs);
   flow.classList.toggle("nohl",!prefs.highlight);flow.classList.toggle("nowh",!prefs.wordHl);$("feed").classList.toggle("nohl",!prefs.highlight);$("feed").classList.toggle("nowh",!prefs.wordHl);lfApplyPrefs();if(!prefs.wordHl)wordsClear();
   if(typeof fillVoiceSelect==="function")fillVoiceSelect();
-  if(book)requestAnimationFrame(()=>{relayout();feedSync()});
+  if(book)requestAnimationFrame(()=>{relayout();feedSync();feedBgSync()});
   else{const on=prefs.mode==="scroll";$("sSpread").closest(".ctl").hidden=on;$("sFlip").closest(".ctl").hidden=on;$("sCols").closest(".ctl").hidden=on;$("layNote").hidden=on;$("modeNote").hidden=!on}
 }
 $("sSize").onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs.size=Math.max(14,Math.min(32,prefs.size+Number(b.dataset.v)*2));applyPrefs()};
 const bool=v=>v==="true";
-[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sWh","wordHl",bool],["sMode","mode",String],["sSpread","spread",bool],["sFlip","flip",bool],["sCols","cols",Number],["sLfc","lfColor",String],["sLfd","lfDim",bool],["sLfx","lfExt",Number]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine")voiceEngineChanged()});
+[["sFont","font",String],["sMeasure","measure",Number],["sLh","lh",Number],["sTheme","theme",String],["sEngine","engine",String],["sSpeed","speed",Number],["sHl","highlight",bool],["sWh","wordHl",bool],["sMode","mode",String],["sFeedBg","feedBg",bool],["sSpread","spread",bool],["sFlip","flip",bool],["sCols","cols",Number],["sLfc","lfColor",String],["sLfd","lfDim",bool],["sLfx","lfExt",Number]].forEach(([id,k,cast])=>$(id).onclick=e=>{const b=e.target.closest("button");if(!b)return;prefs[k]=cast(b.dataset.v);applyPrefs();if(k==="engine")voiceEngineChanged()});
 applyPrefs();
 
 loadCatalog();renderShelf();
