@@ -402,7 +402,7 @@ html.reading{overflow:hidden}
   </div>
   <details class="own">
     <summary>Need a book that is not in the library?</summary>
-    <div class="drop" id="drop">Save its Plain Text, HTML or EPUB file from <a href="https://www.gutenberg.org" target="_blank" rel="noopener">gutenberg.org</a>, then drop it here.<br><input type="file" id="file" accept=".txt,.html,.htm,.epub,text/plain,text/html,application/epub+zip" multiple style="margin-top:8px;max-width:100%"></div>
+    <div class="drop" id="drop">Save its Plain Text, HTML, EPUB or PDF file from <a href="https://www.gutenberg.org" target="_blank" rel="noopener">gutenberg.org</a>, then drop it here.<br><input type="file" id="file" accept=".txt,.html,.htm,.epub,.pdf,text/plain,text/html,application/epub+zip,application/pdf" multiple style="margin-top:8px;max-width:100%"></div>
   </details>
 </section>
 
@@ -611,6 +611,72 @@ function parseHTML(raw,name){
   if(!ch.length)throw new Error("No readable text found in that HTML file.");
   return finish(ch,meta,name);
 }
+let PDFJS=null;
+async function loadPdfjs(){
+  if(PDFJS)return PDFJS;
+  const base="https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.54/legacy/build/";
+  const m=await import(/* webpackIgnore: true */ base+"pdf.min.mjs");
+  m.GlobalWorkerOptions.workerSrc=base+"pdf.worker.min.mjs";
+  return PDFJS=m;
+}
+function pdfLines(items){
+  // Group the page's text fragments into lines (by vertical position), left to right.
+  const rows=[];
+  items.forEach(it=>{
+    const s=it.str;if(!s||!/\S/.test(s))return;
+    const y=it.transform[5],x=it.transform[4],h=Math.abs(it.transform[3])||Math.abs(it.height)||10,w=it.width||0;
+    let row=rows.find(r=>Math.abs(r.y-y)<Math.max(2,h*0.4));
+    if(!row){row={y,h,items:[]};rows.push(row)}
+    row.items.push({x,w,s});
+  });
+  rows.sort((a,b)=>b.y-a.y);   // PDF y grows upward, so the top line comes first
+  return rows.map(r=>{
+    r.items.sort((a,b)=>a.x-b.x);
+    let text="",end=null;
+    r.items.forEach(it=>{if(end!=null&&it.x-end>r.h*0.22&&!/^\s/.test(it.s)&&!/\s$/.test(text))text+=" ";text+=it.s;end=it.x+it.w});
+    const x1=r.items.length?r.items[r.items.length-1].x+r.items[r.items.length-1].w:r.items[0]?r.items[0].x:0;
+    return{y:r.y,x0:r.items[0]?r.items[0].x:0,x1,h:r.h,text:text.replace(/\s+/g," ").trim()};
+  }).filter(l=>l.text);
+}
+function pdfPageText(lines){
+  if(!lines.length)return "";
+  const gaps=[];for(let i=1;i<lines.length;i++)gaps.push(lines[i-1].y-lines[i].y);
+  gaps.sort((a,b)=>a-b);
+  const normal=gaps.length?gaps[Math.floor(gaps.length/2)]:(lines[0].h*1.3);
+  const left=lines.map(l=>l.x0).sort((a,b)=>a-b)[Math.floor(lines.length/2)];
+  const right=lines.map(l=>l.x1).sort((a,b)=>a-b)[Math.floor(lines.length*0.85)];
+  const out=[];let para=[];
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i],prev=lines[i-1];
+    if(prev){
+      const bigGap=prev.y-l.y>normal*1.55+1;                                   // a blank line, a heading, a new section
+      const indentedStart=l.x0-left>prev.h*1.3&&prev.x1<right-prev.h*1.2;      // the line before fell short, this one starts indented: a new paragraph
+      if(bigGap||indentedStart){out.push(para.join(" "));para=[]}
+    }
+    para.push(l.text);
+  }
+  if(para.length)out.push(para.join(" "));
+  return out.filter(Boolean).join("\n\n");
+}
+async function parsePdf(buf,name){
+  const lib=await loadPdfjs().catch(()=>{throw new Error("The PDF reader library did not load. Check your connection and try again.")});
+  let doc;
+  try{doc=await lib.getDocument({data:buf,isEvalSupported:false}).promise}
+  catch(e){throw new Error(e&&e.name==="PasswordException"?"That PDF is password-protected. Remove the password and try again.":"That PDF could not be read. It may be damaged.")}
+  const info=(await doc.getMetadata().catch(()=>null)||{}).info||{};
+  const pages=[];
+  for(let p=1;p<=doc.numPages;p++){
+    const page=await doc.getPage(p),tc=await page.getTextContent();
+    pages.push(pdfPageText(pdfLines(tc.items)));
+    page.cleanup&&page.cleanup();
+  }
+  const raw=pages.filter(Boolean).join("\n\n");
+  if(words(raw)<30)throw new Error("That PDF has no selectable text (it looks like a scan of pages, not real text), so it cannot be read here.");
+  const bk=parseText(raw,name);
+  if(info.Title&&String(info.Title).trim())bk.title=String(info.Title).replace(/\s+/g," ").trim();
+  if(info.Author&&String(info.Author).trim())bk.author=String(info.Author).replace(/\s+/g," ").trim();
+  return bk;
+}
 async function parseEpub(buf,name){
   if(!window.JSZip)throw new Error("The EPUB reader library did not load. Try the .txt or .html file instead.");
   const zip=await JSZip.loadAsync(buf);
@@ -656,6 +722,7 @@ function finish(ch,meta,name){
 async function importFile(f){
   const n=f.name.toLowerCase();let b;
   if(n.endsWith(".epub"))b=await parseEpub(await f.arrayBuffer(),f.name);
+  else if(n.endsWith(".pdf"))b=await parsePdf(await f.arrayBuffer(),f.name);
   else{
     const raw=await f.text();
     b=(n.endsWith(".html")||n.endsWith(".htm")||/^\s*(<!doctype|<html)/i.test(raw.slice(0,200)))?parseHTML(raw,f.name):parseText(raw,f.name);
