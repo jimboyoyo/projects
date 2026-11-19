@@ -658,6 +658,12 @@ function pdfPageText(lines){
   if(para.length)out.push(para.join(" "));
   return out.filter(Boolean).join("\n\n");
 }
+function pdfGarbled(raw){
+  const sample=raw.slice(0,6000),n=sample.replace(/\s/g,"").length||1;
+  const bad=(sample.match(/[\uFFFD\uE000-\uF8FF\u0000-\u0008\u000B\u000C\u000E-\u001F]/g)||[]).length;
+  const letters=(sample.match(/[\p{L}\p{N}]/gu)||[]).length;
+  return bad/n>0.03||letters/n<0.55;
+}
 async function parsePdf(buf,name){
   const lib=await loadPdfjs().catch(()=>{throw new Error("The PDF reader library did not load. Check your connection and try again.")});
   let doc;
@@ -672,6 +678,7 @@ async function parsePdf(buf,name){
   }
   const raw=pages.filter(Boolean).join("\n\n");
   if(words(raw)<30)throw new Error("That PDF has no selectable text (it looks like a scan of pages, not real text), so it cannot be read here.");
+  if(pdfGarbled(raw))throw new Error("This PDF\u2019s text came out as garbled characters, not real words. This happens with some PDFs made from Word (often through Adobe), when the file does not say how its letters map to its font. Try re-exporting it \u2014 Word\u2019s own \u201cSave as PDF\u201d usually avoids this \u2014 or upload the Word file saved as Plain Text or HTML instead.");
   const bk=parseText(raw,name);
   if(info.Title&&String(info.Title).trim())bk.title=String(info.Title).replace(/\s+/g," ").trim();
   if(info.Author&&String(info.Author).trim())bk.author=String(info.Author).replace(/\s+/g," ").trim();
