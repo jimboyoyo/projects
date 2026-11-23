@@ -1176,8 +1176,83 @@ input::placeholder{color:#A39A93}
 </div>
 </sc-if>
 
-<sc-if value="{{showSoon}}" hint-placeholder-val="{{false}}">
+<sc-if value="{{showFault}}" hint-placeholder-val="{{false}}">
 <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+  <div style="padding:8px 8px 0">
+    <button type="button" onClick="{{backClub}}" style="min-height:44px;display:flex;align-items:center;gap:2px;padding:0 12px 0 4px;background:none;border:0;color:{{accentText}};font-size:16px;font-weight:600;cursor:pointer">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+      Cancel
+    </button>
+  </div>
+  <div style="flex:1;min-height:0;overflow-y:auto;padding:4px 16px 24px;display:flex;flex-direction:column;gap:18px">
+    <h2 style="margin:0;font:700 34px/1.05 'Barlow Condensed',sans-serif">Felanmälan</h2>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-weight:600">What needs fixing?</span>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <sc-for list="{{faultCatBtns}}" as="c" hint-placeholder-count="6">
+          <button type="button" aria-pressed="{{c.pressed}}" onClick="{{c.pick}}" style="min-height:44px;padding:0 14px;border-radius:22px;border:1.5px solid {{c.border}};background:{{c.bg}};color:{{c.fg}};font-size:14px;font-weight:600;cursor:pointer">{{c.label}}</button>
+        </sc-for>
+      </div>
+      <span style="font-size:13px;color:#A39A93">Pick as many as you like.</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <label for="f-fault" style="font-weight:600">Tell us more <span style="font-weight:400;color:#A39A93">(optional)</span></label>
+      <textarea id="f-fault" rows="4" placeholder="What is wrong, and where?" value="{{fText}}" onChange="{{onFText}}" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1.5px solid #3D3D3D;background:#111111;color:#F1ECE7;font-family:inherit;font-size:16px;line-height:1.4;resize:none"></textarea>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button type="button" onClick="{{submitFault}}" style="min-height:52px;border:0;border-radius:12px;background:{{accent}};color:#FFFFFF;font-size:16px;font-weight:600;cursor:pointer">Send report</button>
+      <sc-if value="{{hasFErr}}" hint-placeholder-val="{{false}}">
+        <span style="font-size:13px;color:#F08A80;text-align:center">{{fErr}}</span>
+      </sc-if>
+      <span style="font-size:13px;color:#A39A93;text-align:center">Your report goes to the club staff.</span>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{showFaultList}}" hint-placeholder-val="{{false}}">
+<div style="flex:1;min-height:0;display:flex;flex-direction:column">
+  <div style="padding:8px 8px 0">
+    <button type="button" onClick="{{backClub}}" style="min-height:44px;display:flex;align-items:center;gap:2px;padding:0 12px 0 4px;background:none;border:0;color:{{accentText}};font-size:16px;font-weight:600;cursor:pointer">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>
+      Club
+    </button>
+  </div>
+  <div style="padding:4px 16px 8px">
+    <h2 style="margin:0;font:700 34px/1.05 'Barlow Condensed',sans-serif">Fault reports</h2>
+    <p style="margin:6px 0 0;font-size:13px;color:#A39A93">{{faultCountText}}</p>
+  </div>
+  <div style="flex:1;min-height:0;overflow-y:auto;padding:4px 16px 24px;display:flex;flex-direction:column;gap:12px">
+    <sc-for list="{{faultItems}}" as="x" hint-placeholder-count="2">
+      <div style="display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:16px;background:#111111;border:1px solid #262626;opacity:{{x.op}}">
+        <span style="display:flex;gap:10px;align-items:center">
+          <span style="width:36px;height:36px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;font-weight:600;background:{{x.avBg}};color:{{x.avFg}}">{{x.initials}}</span>
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <span style="font-weight:600">{{x.who}}</span>
+            <span style="font-size:12px;color:#A39A93">{{x.at}}</span>
+          </span>
+          <sc-if value="{{x.done}}" hint-placeholder-val="{{false}}">
+            <span style="padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;background:#242424;color:#C4BBB4">{{x.doneText}}</span>
+          </sc-if>
+        </span>
+        <sc-if value="{{x.hasCats}}" hint-placeholder-val="{{true}}">
+          <span style="font-weight:600">{{x.catText}}</span>
+        </sc-if>
+        <sc-if value="{{x.hasText}}" hint-placeholder-val="{{false}}">
+          <span style="color:#C4BBB4">{{x.text}}</span>
+        </sc-if>
+        <button type="button" aria-label="{{x.toggleLabel}}" onClick="{{x.toggle}}" style="align-self:flex-start;min-height:44px;padding:0 18px;border-radius:22px;border:1.5px solid {{x.toggleBd}};background:{{x.toggleBg}};color:{{x.toggleFg}};font-size:14px;font-weight:600;cursor:pointer">{{x.toggleText}}</button>
+      </div>
+    </sc-for>
+    <sc-if value="{{noFaults}}" hint-placeholder-val="{{false}}">
+      <p style="margin:24px 0;text-align:center;color:#A39A93">No fault reports. Reports from members show up here.</p>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{showSoon}}" hint-placeholder-val="{{false}}">
+<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column">
   <div style="padding:24px 16px 8px">
     <h1 style="margin:0;font:700 36px/1 'Barlow Condensed',sans-serif;letter-spacing:.01em">{{soonTitle}}</h1>
   </div>
@@ -1196,6 +1271,22 @@ input::placeholder{color:#A39A93}
     </div>
     <sc-if value="{{hasClubMsg}}" hint-placeholder-val="{{false}}">
       <span role="status" style="padding:10px 12px;border-radius:10px;background:#2B201A;color:#D8B89C;font-size:14px;font-weight:600">{{clubMsg}}</span>
+    </sc-if>
+    <button type="button" onClick="{{openFault}}" style="min-height:56px;display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:0 14px;border-radius:14px;border:1.5px solid #3D3D3D;background:#111111;color:#F1ECE7;font-size:16px;font-weight:600;text-align:left;cursor:pointer">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{{accentText}}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4 2.6-2.6z"></path></svg>
+      <span style="flex:1;display:flex;flex-direction:column">
+        <span>Felanmälan</span>
+        <span style="font-size:13px;font-weight:400;color:#A39A93">Report something that needs fixing</span>
+      </span>
+    </button>
+    <sc-if value="{{isMod}}" hint-placeholder-val="{{false}}">
+      <button type="button" onClick="{{openFaultList}}" style="min-height:56px;display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:0 14px;border-radius:14px;border:1.5px solid #3D3D3D;background:#111111;color:#F1ECE7;font-size:16px;font-weight:600;text-align:left;cursor:pointer">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="{{accentText}}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M8 12.5l3 3 5-6"></path></svg>
+        <span style="flex:1">Fault reports</span>
+        <sc-if value="{{hasFaultOpen}}" hint-placeholder-val="{{false}}">
+          <span style="min-width:24px;height:24px;box-sizing:border-box;padding:0 7px;border-radius:12px;background:{{accent}};color:#FFFFFF;font-size:13px;font-weight:600;line-height:24px;text-align:center">{{faultOpenBadge}}</span>
+        </sc-if>
+      </button>
     </sc-if>
     <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;padding:14px;background:#111111;border:1px solid #262626;border-radius:14px">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
@@ -1218,7 +1309,7 @@ input::placeholder{color:#A39A93}
     </div>
   </div>
   </sc-if>
-  <div style="flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px 32px;text-align:center">
+  <div style="flex:1;min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px 32px;text-align:center">
     <span style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1.5px solid #3D3D3D;color:{{accentText}}">
       <sc-if value="{{soonClub}}" hint-placeholder-val="{{false}}"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V9l7-5 7 5v12M10 21v-6h4v6"></path></svg></sc-if>
       <sc-if value="{{soonSched}}" hint-placeholder-val="{{true}}"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path></svg></sc-if>
@@ -1326,7 +1417,10 @@ input::placeholder{color:#A39A93}
 class Component extends DCLogic {
   constructor(...args) {
     super(...args);
-    this.state = { screen: 'channels', filter: 'all', openId: 'open', resp: { seminar: 'thinking' }, cal: {}, joined: {}, sent: {}, draft: '', err: false, linkNote: false, created: [], form: this.blankForm(), formErr: {}, ride: {}, chatTab: 'chat', asked: {}, reqIn: {}, offIn: {}, offered: {}, chatFrom: 'detail', chan: 'general', chRead: {}, chMuted: { 'off-topic': true }, chSent: {}, cDraft: '', cErr: false, chReply: null, chAttach: false, chSel: '', chReact: {}, chDiv: 0, secClosed: {}, role: 'member', manage: false, delChans: {}, delSecs: {}, addChans: [], addSecs: [], confirm: null, modMode: 'channel', mf: { name: '', sec: '', kind: 'chat', topic: '' }, mfErr: {}, nextId: 1, pins: {}, chEdits: {}, secEdits: {}, modEditId: null, delMsgs: {}, msgAsk: '', reports: { 'general:35': 'Reported' }, repLog: [{ chName: 'general', name: 'Erik', time: 'Sep 28 18:20', text: 'Why does the coach always pick the same people for the team?', action: 'Removed', when: 'Sep 29 09:12' }, { chName: 'lost-and-found', name: 'Jonas', time: 'Sep 20 12:05', text: 'Anyone seen my gi? Pretty sure someone took it.', action: 'Dismissed', when: 'Sep 20 13:40' }], repAsk: '', classes: { 'bjj-adv': 'on', 'bjj-comp': 'on' }, classReqs: [{ id: 'q0a', who: 'Mia', cls: 'bjj-kids', note: 'For my daughter Ella, age 9' }, { id: 'q0b', who: 'Erik', cls: 'thai-kids', note: 'For my son Noel, age 8' }], reqN: 1, evMute: {}, mutedUnread: true, sw: null, modNote: null, dmGroups: [{ id: 'gseed', name: 'Comp team crew', members: ['Anna', 'Erik', 'Jonas'] }], dmGN: 1, dmRename: '', dmLeaveAsk: false, dmSel: {}, dmGName: '', dmWith: '', dmSent: {}, dmRead: {}, dmOrder: [], dmDraft: '', dmErr: false, here: [{ name: 'Mia', at: Date.now() - 20 * 60000 }, { name: 'Erik', at: Date.now() - 95 * 60000 }, { name: 'Anna', at: Date.now() - 117 * 60000 }] };
+    this.state = { screen: 'channels', filter: 'all', openId: 'open', resp: { seminar: 'thinking' }, cal: {}, joined: {}, sent: {}, draft: '', err: false, linkNote: false, created: [], form: this.blankForm(), formErr: {}, ride: {}, chatTab: 'chat', asked: {}, reqIn: {}, offIn: {}, offered: {}, chatFrom: 'detail', chan: 'general', chRead: {}, chMuted: { 'off-topic': true }, chSent: {}, cDraft: '', cErr: false, chReply: null, chAttach: false, chSel: '', chReact: {}, chDiv: 0, secClosed: {}, role: 'member', manage: false, delChans: {}, delSecs: {}, addChans: [], addSecs: [], confirm: null, modMode: 'channel', mf: { name: '', sec: '', kind: 'chat', topic: '' }, mfErr: {}, nextId: 1, pins: {}, chEdits: {}, secEdits: {}, modEditId: null, delMsgs: {}, msgAsk: '', reports: { 'general:35': 'Reported' }, repLog: [{ chName: 'general', name: 'Erik', time: 'Sep 28 18:20', text: 'Why does the coach always pick the same people for the team?', action: 'Removed', when: 'Sep 29 09:12' }, { chName: 'lost-and-found', name: 'Jonas', time: 'Sep 20 12:05', text: 'Anyone seen my gi? Pretty sure someone took it.', action: 'Dismissed', when: 'Sep 20 13:40' }], repAsk: '', classes: { 'bjj-adv': 'on', 'bjj-comp': 'on' }, classReqs: [{ id: 'q0a', who: 'Mia', cls: 'bjj-kids', note: 'For my daughter Ella, age 9' }, { id: 'q0b', who: 'Erik', cls: 'thai-kids', note: 'For my son Noel, age 8' }], reqN: 1, evMute: {}, mutedUnread: true, sw: null, modNote: null, dmGroups: [{ id: 'gseed', name: 'Comp team crew', members: ['Anna', 'Erik', 'Jonas'] }], dmGN: 1, dmRename: '', dmLeaveAsk: false, dmSel: {}, dmGName: '', dmWith: '', dmSent: {}, dmRead: {}, dmOrder: [], dmDraft: '', dmErr: false, faults: [
+  { id: 'f0a', who: 'Anna', cats: ['Showers need cleaning'], text: 'No hot water in the women\'s shower.', at: 'Mon 07:40', done: false, doneAt: '' },
+  { id: 'f0b', who: 'Erik', cats: ['Mats are dirty'], text: '', at: 'Sun 20:15', done: true, doneAt: 'Mon 08:10' }
+], fCats: {}, fText: '', fErr: '', faultN: 1, here: [{ name: 'Mia', at: Date.now() - 20 * 60000 }, { name: 'Erik', at: Date.now() - 95 * 60000 }, { name: 'Anna', at: Date.now() - 117 * 60000 }] };
     this._hereTick = setInterval(() => { const n = Date.now(); this.setState({ here: (this.state.here || []).filter((h) => n - h.at < 7200000) }); }, 20000);
   }
 
@@ -2233,6 +2327,35 @@ class Component extends DCLogic {
     const hereAct = (s.here || []).filter((h) => hereNow - h.at < 7200000);
     const tabOf = (s.screen === 'channels' || s.screen === 'dmList') ? 'ch' : s.screen === 'settings' ? 'st' : s.screen === 'schedule' ? 'sc' : s.screen === 'club' ? 'cl' : 'ev';
 
+    const faultCats = ['Showers need cleaning', 'Toilets need cleaning', 'Mats are dirty', 'Something is broken', 'Out of supplies', 'Other'];
+const faultCatBtns = faultCats.map((c) => {
+  const on = !!s.fCats[c];
+  return { label: c, pressed: String(on), bg: on ? accent : '#111111', fg: on ? '#FFFFFF' : '#F1ECE7', border: on ? accent : '#3D3D3D', pick: () => this.setState({ fCats: Object.assign({}, s.fCats, { [c]: !on }), fErr: '' }) };
+});
+const fSel = faultCats.filter((c) => s.fCats[c]);
+const submitFault = () => {
+  const t = (s.fText || '').trim();
+  if (!fSel.length && !t) { this.setState({ fErr: 'Pick at least one option or write a few words' }); return; }
+  this.setState({
+    faults: [{ id: 'f' + s.faultN, who: 'You', cats: fSel, text: t, at: 'Now', done: false, doneAt: '' }].concat(s.faults),
+    faultN: s.faultN + 1, fCats: {}, fText: '', fErr: '', screen: 'club', clubMsg: 'Thank you! Your report was sent to the staff.'
+  });
+};
+const faultSorted = s.faults.filter((x) => !x.done).concat(s.faults.filter((x) => x.done));
+const faultItems = faultSorted.map((x) => {
+  const av = avOf(x.who);
+  return {
+    who: x.who, initials: iniOf(x.who), avBg: av[0], avFg: av[1], at: x.at,
+    hasCats: x.cats.length > 0, catText: x.cats.join(' · '), hasText: !!x.text, text: x.text,
+    done: x.done, doneText: 'Done ' + (x.doneAt || ''), op: x.done ? 0.6 : 1,
+    toggleText: x.done ? 'Reopen' : 'Mark as done',
+    toggleLabel: (x.done ? 'Reopen report from ' : 'Mark as done: report from ') + x.who,
+    toggleBg: x.done ? '#111111' : accent, toggleFg: x.done ? '#F1ECE7' : '#FFFFFF', toggleBd: x.done ? '#3D3D3D' : accent,
+    toggle: () => this.setState({ faults: s.faults.map((y) => (y.id === x.id ? Object.assign({}, y, { done: !y.done, doneAt: y.done ? '' : 'Now' }) : y)) })
+  };
+});
+const faultOpenN = s.faults.filter((x) => !x.done).length;
+
     const roleBtns = [['member', 'Member'], ['moderator', 'Moderator']].map(([k, label]) => {
       const on = s.role === k;
       return { label, pressed: String(on), bg: on ? accent : '#111111', fg: on ? '#FFFFFF' : '#F1ECE7', border: on ? accent : '#3D3D3D', pick: () => this.setState({ role: k, manage: false, confirm: null }) };
@@ -2297,6 +2420,16 @@ class Component extends DCLogic {
     return {
       accent, accentText,
       showChannels: s.screen === 'channels',
+      showFault: s.screen === 'fault', showFaultList: s.screen === 'faultList',
+faultCatBtns, faultItems, noFaults: s.faults.length === 0,
+fText: s.fText, fErr: s.fErr, hasFErr: !!s.fErr,
+onFText: (ev) => this.setState({ fText: ev.target.value, fErr: '' }),
+submitFault,
+openFault: () => this.setState({ screen: 'fault', fErr: '' }),
+openFaultList: () => this.setState({ screen: 'faultList' }),
+backClub: () => this.setState({ screen: 'club', fErr: '' }),
+faultOpenN, hasFaultOpen: faultOpenN > 0, faultOpenBadge: String(faultOpenN),
+faultCountText: faultOpenN + ' open · ' + (s.faults.length - faultOpenN) + ' done',
       showDmList: s.screen === 'dmList', showDmReports: s.screen === 'dmReports',
       repHistory: s.repLog.map((e) => {
         const rem = e.action === 'Removed';
