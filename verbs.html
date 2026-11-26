@@ -10,15 +10,15 @@
 /* Layout: a timeline running left→right (past · present · future), aspects stacked as rows */
 :root{
   --bg:#f3f5f8; --surface:#ffffff; --fg:#1a2130; --muted:#5d6779; --line:#d9dee7;
-  --past:#6b5bd2; --present:#0f8a6c; --future:#c2611b; --tip:#1a2130; --tipfg:#f3f5f8;
+  --past:#6b5bd2; --present:#0f8a6c; --future:#c2611b; --tip:#1a2130; --tipfg:#f3f5f8; --bcol:#2f6fd6;
   --display:"Fraunces",Georgia,serif; --body:"Inter",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#12161e; --surface:#1b212c; --fg:#e6e9ef; --muted:#9aa3b3; --line:#2c3442;
-  --past:#a395ff; --present:#3fd0a8; --future:#f29a55; --tip:#e6e9ef; --tipfg:#12161e; color-scheme:dark}}
+  --past:#a395ff; --present:#3fd0a8; --future:#f29a55; --tip:#e6e9ef; --tipfg:#12161e; --bcol:#79a8ff; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#12161e; --surface:#1b212c; --fg:#e6e9ef; --muted:#9aa3b3; --line:#2c3442;
-  --past:#a395ff; --present:#3fd0a8; --future:#f29a55; --tip:#e6e9ef; --tipfg:#12161e; color-scheme:dark}
+  --past:#a395ff; --present:#3fd0a8; --future:#f29a55; --tip:#e6e9ef; --tipfg:#12161e; --bcol:#79a8ff; color-scheme:dark}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
 .wrap{max-width:1040px;margin:0 auto;padding-block:32px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:24px}
 h1{font-family:var(--display);font-weight:700;font-size:clamp(1.7rem,4vw,2.4rem);margin:0;text-wrap:balance}
@@ -26,9 +26,9 @@ h1{font-family:var(--display);font-weight:700;font-size:clamp(1.7rem,4vw,2.4rem)
 .entry{display:flex;flex-wrap:wrap;gap:12px;align-items:end}
 .field{display:grid;gap:4px}
 label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
-#verb{font-family:var(--display);font-size:1.8rem;padding:10px 16px;border:2px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);width:min(320px,100%)}
-#verb:focus,#subj:focus{outline:none;border-color:var(--present)}
-#subj{font:inherit;padding:14px 12px;border:2px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg)}
+#verb,#verb2{font-family:var(--display);font-size:1.8rem;padding:10px 16px;border:2px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);width:min(320px,100%)}
+#verb:focus,#subj:focus,#verb2:focus,#subj2:focus{outline:none;border-color:var(--present)}
+#subj,#subj2{font:inherit;padding:14px 12px;border:2px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg)}
 .forms{display:flex;flex-wrap:wrap;gap:8px 20px;font-family:var(--mono);font-size:.85rem;color:var(--muted)}
 .forms b{color:var(--fg);font-weight:500}
 .note{font-size:.85rem;color:var(--muted);min-height:1.3em;margin:0}
@@ -49,6 +49,18 @@ label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(-
 .tip{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);background:var(--tip);color:var(--tipfg);font-family:var(--mono);font-size:.78rem;padding:8px 10px;border-radius:6px;width:max-content;max-width:240px;opacity:0;pointer-events:none;transition:opacity .12s;z-index:5}
 .tip em{display:block;font-family:var(--body);font-style:normal;opacity:.75;margin-top:4px}
 .cell:hover .tip,.cell:focus .tip{opacity:1}
+.toggle{text-transform:none;letter-spacing:0;font-size:.95rem;color:var(--fg);display:flex;align-items:center;gap:8px;padding:12px 14px;border:2px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;font-weight:500;user-select:none}
+.toggle input{width:18px;height:18px;accent-color:var(--present);margin:0}
+.toggle:has(input:focus-visible){border-color:var(--present)}
+.vs{font-family:var(--display);font-size:1.4rem;color:var(--muted);align-self:center;padding:0 4px}
+.tag{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:5px;font:600 .7rem var(--body);margin-right:6px;vertical-align:2px;background:var(--line);color:var(--fg)}
+.tag.b{background:var(--bcol);color:var(--surface)}
+.vals{display:grid;gap:2px 14px}
+.cmp .vals{grid-template-columns:1fr 1fr}
+.cmp .grid{min-width:900px}
+.val2{color:var(--bcol)}
+.val.diff{text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:4px}
+.formrows{display:grid;gap:6px}
 .hl{color:var(--present);font-weight:600}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -64,8 +76,15 @@ label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(-
     <div class="field"><label for="verb">Verb</label><input id="verb" value="write" autocomplete="off" spellcheck="false"></div>
     <div class="field"><label for="subj">Subject</label>
       <select id="subj"><option>I</option><option>you</option><option selected>she</option><option>he</option><option>it</option><option>we</option><option>they</option></select></div>
+    <label class="toggle" for="cmp"><input type="checkbox" id="cmp"> Compare</label>
   </div>
-  <div class="forms" id="forms"></div>
+  <div class="entry" id="entryB" hidden>
+    <span class="vs">vs</span>
+    <div class="field"><label for="verb2"><span class="tag b">B</span>Verb</label><input id="verb2" value="write" autocomplete="off" spellcheck="false"></div>
+    <div class="field"><label for="subj2">Subject</label>
+      <select id="subj2"><option>I</option><option>you</option><option>she</option><option>he</option><option>it</option><option>we</option><option selected>they</option></select></div>
+  </div>
+  <div class="formrows" id="forms"></div>
   <p class="note" id="note"></p>
   <div class="scroll"><div class="grid" id="grid"></div></div>
 </div>
@@ -167,26 +186,39 @@ const grid=document.getElementById("grid");
 const LABEL={past:["Past","before now"],present:["Present","now"],future:["Future","after now"]};
 grid.innerHTML='<div></div>'+TENSES.map(t=>`<div class="head h-${t}">${LABEL[t][0]}<small>${LABEL[t][1]}</small></div>`).join("")+
  ASPECTS.map(a=>`<div class="aspect">${a}</div>`+TENSES.map(t=>
-  `<div class="cell" tabindex="0" data-t="${t}" data-a="${a}"><div class="name">${cap(t)} ${a}</div><div class="val"></div><div class="tip">${FORMULA[t][a][0]}<em>${FORMULA[t][a][1]}</em></div></div>`).join("")).join("");
+  `<div class="cell" tabindex="0" data-t="${t}" data-a="${a}"><div class="name">${cap(t)} ${a}</div><div class="vals"><div class="val val1"></div><div class="val val2" hidden></div></div><div class="tip">${FORMULA[t][a][0]}<em>${FORMULA[t][a][1]}</em></div></div>`).join("")).join("");
 
-const $v=document.getElementById("verb"),$s=document.getElementById("subj");
+const $=id=>document.getElementById(id);
+const $v=$("verb"),$s=$("subj"),$v2=$("verb2"),$s2=$("subj2"),$c=$("cmp");
+const clean=x=>x.trim().toLowerCase().replace(/^to\s+/,"");
+const valid=v=>/^[a-z]+$/.test(v);
+function formsLine(v,tag){
+  const I=getIrr(v);
+  return `<div class="forms">${tag}<span>base <b>${v}</b></span><span>past (V2) <b>${I?I.p:ed(v)}</b></span><span>participle (V3) <b>${I?I.pp:ed(v)}</b></span><span>-ing <b>${ing(v)}</b></span></div>`;
+}
 function render(){
-  let v=$v.value.trim().toLowerCase().replace(/^to\s+/,"");
-  const s=$s.value, ok=/^[a-z]+$/.test(v);
-  const note=document.getElementById("note"), forms=document.getElementById("forms");
-  if(!ok){
-    grid.querySelectorAll(".val").forEach(e=>e.textContent="—");
-    forms.innerHTML=""; note.textContent=v?"Use letters only, e.g. “swim”.":"Type a verb in its base form, e.g. “swim”.";
-    return;
-  }
-  const I=getIrr(v), isIrr=!!I;
-  forms.innerHTML=`<span>base <b>${v}</b></span><span>past (V2) <b>${isIrr?I.p:ed(v)}</b></span><span>participle (V3) <b>${isIrr?I.pp:ed(v)}</b></span><span>-ing <b>${ing(v)}</b></span>`;
-  note.innerHTML=isIrr?`<span class="hl">Irregular verb.</span> Learn its past forms by heart.`:"Regular verb: past forms add -ed. Spelling follows British English (travelled, learnt).";
+  const cmp=$c.checked;
+  document.body.classList.toggle("cmp",cmp); $("entryB").hidden=!cmp;
+  const v=clean($v.value),s=$s.value,v2=clean($v2.value),s2=$s2.value;
+  const okA=valid(v), okB=valid(v2);
+  const note=$("note"), forms=$("forms");
+  let f="", n=[];
+  const tagA=cmp?'<span class="tag">A</span>':"", tagB='<span class="tag b">B</span>';
+  if(okA){f+=formsLine(v,tagA); n.push((cmp?"A: ":"")+(getIrr(v)?`<span class="hl">${v} is irregular.</span> Learn its past forms by heart.`:`${v} is regular: past forms add -ed.`));}
+  else n.push(v?"Use letters only, e.g. “swim”.":"Type a verb in its base form, e.g. “swim”.");
+  if(cmp){ if(okB){f+=formsLine(v2,tagB); if(v2!==v)n.push("B: "+(getIrr(v2)?`<span class="hl">${v2} is irregular.</span>`:`${v2} is regular.`));} else n.push("B: type a verb."); }
+  forms.innerHTML=f; note.innerHTML=n.join(" &nbsp;·&nbsp; ")+" Spelling follows British English.";
   grid.querySelectorAll(".cell").forEach(c=>{
-    c.querySelector(".val").textContent=cap(s)+" "+conj(v,s,c.dataset.t,c.dataset.a);
+    const t=c.dataset.t,a=c.dataset.a, e1=c.querySelector(".val1"), e2=c.querySelector(".val2");
+    const A=okA?cap(s)+" "+conj(v,s,t,a):"—", B=okB?cap(s2)+" "+conj(v2,s2,t,a):"—";
+    e1.textContent=A; e2.hidden=!cmp; e2.textContent=B;
+    // underline the parts that change between A and B
+    const d=cmp&&okA&&okB&&v===v2&&s!==s2;
+    [e1,e2].forEach((e,k)=>{ if(!d)return; const other=(k?A:B).split(" "); e.innerHTML=(k?B:A).split(" ").map((w,i)=>w.toLowerCase()!==(other[i]||"").toLowerCase()?`<b style="font-weight:700">${w}</b>`:w).join(" "); });
   });
 }
-$v.addEventListener("input",render); $s.addEventListener("change",render);
+[$v,$v2].forEach(e=>e.addEventListener("input",render));
+[$s,$s2,$c].forEach(e=>e.addEventListener("change",render));
 render();
 </script>
 
