@@ -94,7 +94,7 @@ function doubles(v){
   // British spelling: travel → travelling, cancel → cancelled
   if(syll(v)>=2&&/[^aeiou][aeiou]l$/.test(v))return true;
   // prefixed one-syllable roots: restop → restopping
-  for(const pre of ["re","un","over","out"]) if(v.startsWith(pre)&&v.length-pre.length>=3&&/^[^aeiou]+[aeiou][^aeiouwxy]$/.test(v.slice(pre.length)))return true;
+  for(const pre of ["re","un","up","over","out","under","mis"]) if(v.startsWith(pre)&&v.length-pre.length>=3&&/^[^aeiou]+[aeiou][^aeiouwxy]$/.test(v.slice(pre.length)))return true;
   // one-syllable CVC, not ending w/x/y
   const m=v.match(/^[^aeiou]*[aeiou][^aeiouwxy]$/);
   return !!m && !/^(qu)/.test(v) ? true : /^qu[aeiou][^aeiouwxy]$/.test(v);
