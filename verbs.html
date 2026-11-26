@@ -71,19 +71,37 @@ label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(-
 </div>
 
 <script>
-const IRR = `arise arose arisen|awake awoke awoken|be was been|bear bore borne|beat beat beaten|become became become|begin began begun|bend bent bent|bet bet bet|bind bound bound|bite bit bitten|bleed bled bled|blow blew blown|break broke broken|breed bred bred|bring brought brought|build built built|burn burnt burnt|burst burst burst|buy bought bought|catch caught caught|choose chose chosen|cling clung clung|come came come|cost cost cost|creep crept crept|cut cut cut|deal dealt dealt|dig dug dug|do did done|draw drew drawn|dream dreamt dreamt|drink drank drunk|drive drove driven|eat ate eaten|fall fell fallen|feed fed fed|feel felt felt|fight fought fought|find found found|flee fled fled|fly flew flown|forbid forbade forbidden|forget forgot forgotten|forgive forgave forgiven|freeze froze frozen|get got got|give gave given|go went gone|grind ground ground|grow grew grown|hang hung hung|have had had|hear heard heard|hide hid hidden|hit hit hit|hold held held|hurt hurt hurt|keep kept kept|kneel knelt knelt|know knew known|lay laid laid|lead led led|lean leant leant|leap leapt leapt|learn learnt learnt|leave left left|lend lent lent|let let let|lie lay lain|light lit lit|lose lost lost|make made made|mean meant meant|meet met met|pay paid paid|prove proved proven|put put put|quit quit quit|read read read|ride rode ridden|ring rang rung|rise rose risen|run ran run|say said said|see saw seen|seek sought sought|sell sold sold|send sent sent|set set set|sew sewed sewn|shake shook shaken|shine shone shone|shoot shot shot|show showed shown|shrink shrank shrunk|shut shut shut|sing sang sung|sink sank sunk|sit sat sat|sleep slept slept|slide slid slid|speak spoke spoken|speed sped sped|spend spent spent|spin spun spun|spit spat spat|split split split|spread spread spread|spring sprang sprung|stand stood stood|steal stole stolen|stick stuck stuck|sting stung stung|stink stank stunk|stride strode stridden|strike struck struck|swear swore sworn|sweep swept swept|swim swam swum|swing swung swung|take took taken|teach taught taught|tear tore torn|tell told told|think thought thought|throw threw thrown|understand understood understood|wake woke woken|wear wore worn|weave wove woven|weep wept wept|win won won|wind wound wound|withdraw withdrew withdrawn|write wrote written`;
+const IRR = `arise arose arisen|awake awoke awoken|be was been|bear bore borne|beat beat beaten|become became become|begin began begun|bend bent bent|bet bet bet|bind bound bound|bite bit bitten|bleed bled bled|blow blew blown|break broke broken|breed bred bred|bring brought brought|build built built|burn burnt burnt|burst burst burst|buy bought bought|catch caught caught|choose chose chosen|cling clung clung|come came come|cost cost cost|creep crept crept|cut cut cut|deal dealt dealt|dig dug dug|do did done|draw drew drawn|dream dreamt dreamt|drink drank drunk|drive drove driven|eat ate eaten|fall fell fallen|feed fed fed|feel felt felt|fight fought fought|find found found|flee fled fled|fly flew flown|forbid forbade forbidden|forget forgot forgotten|forgive forgave forgiven|freeze froze frozen|get got got|give gave given|go went gone|grind ground ground|grow grew grown|hang hung hung|have had had|hear heard heard|hide hid hidden|hit hit hit|hold held held|hurt hurt hurt|keep kept kept|kneel knelt knelt|know knew known|lay laid laid|lead led led|lean leant leant|leap leapt leapt|learn learnt learnt|leave left left|lend lent lent|let let let|lie lay lain|light lit lit|lose lost lost|make made made|mean meant meant|meet met met|pay paid paid|prove proved proven|put put put|quit quit quit|read read read|ride rode ridden|ring rang rung|rise rose risen|run ran run|say said said|see saw seen|seek sought sought|sell sold sold|send sent sent|set set set|sew sewed sewn|shake shook shaken|shine shone shone|shoot shot shot|show showed shown|shrink shrank shrunk|shut shut shut|sing sang sung|sink sank sunk|sit sat sat|sleep slept slept|slide slid slid|speak spoke spoken|speed sped sped|spend spent spent|spin spun spun|spit spat spat|split split split|spread spread spread|spring sprang sprung|stand stood stood|steal stole stolen|stick stuck stuck|sting stung stung|stink stank stunk|stride strode stridden|strike struck struck|swear swore sworn|sweep swept swept|swim swam swum|swing swung swung|take took taken|teach taught taught|tear tore torn|tell told told|think thought thought|throw threw thrown|understand understood understood|wake woke woken|wear wore worn|weave wove woven|weep wept wept|win won won|wind wound wound|withdraw withdrew withdrawn|write wrote written|abide abode abode|behold beheld beheld|beset beset beset|befall befell befallen|bid bid bid|broadcast broadcast broadcast|cast cast cast|dive dived dived|dwell dwelt dwelt|fit fit fit|forecast forecast forecast|forgo forwent forgone|forsake forsook forsaken|input input input|knit knit knit|mow mowed mown|output output output|partake partook partaken|rid rid rid|saw sawed sawn|shear sheared shorn|shed shed shed|slay slew slain|sling slung slung|slink slunk slunk|smell smelt smelt|sow sowed sown|spell spelt spelt|spill spilt spilt|spoil spoilt spoilt|stride strode stridden|string strung strung|strive strove striven|swell swelled swollen|thrust thrust thrust|tread trod trodden|wed wed wed|wring wrung wrung|spoil spoilt spoilt|burn burnt burnt|light lit lit|lie lay lain|cling clung clung|grind ground ground|overcome overcame overcome|become became become`;
+// Prefixed verbs (undo, overcome, mislead, withstand, foresee...) take the irregular forms of their root
+const PREF=["under","over","with","fore","out","mis","re","un","up"];
+const NOT_IRR=new Set("relay outfit refit unfit".split(" "));
 const irr = {}; IRR.split("|").forEach(s=>{const [b,p,pp]=s.split(" ");irr[b]={p,pp}});
 // Common verbs that double the final consonant (stressed last syllable)
-const DOUBLE = new Set("admit commit control occur permit prefer refer regret submit transfer equip forget begin omit".split(" "));
+const DOUBLE = new Set("abhor acquit admit allot annul commit compel concur confer control defer deter emit enrol equip excel expel extol forget begin incur infer occur omit outwit patrol permit prefer propel rebel recur refer regret remit submit transfer transmit unpin".split(" "));
+function getIrr(v){
+  if(NOT_IRR.has(v))return null;
+  if(irr[v])return irr[v];
+  for(const pre of PREF){
+    const root=v.slice(pre.length);
+    if(v.startsWith(pre)&&root.length>=2&&irr[root]&&root!=="be")return {p:pre+irr[root].p,pp:pre+irr[root].pp};
+  }
+  return null;
+}
+const syll=v=>(v.replace(/e$/,"").match(/[aeiouy]+/g)||[]).length;
 const V="aeiou";
 function doubles(v){
   if(DOUBLE.has(v))return true;
+  // British spelling: travel → travelling, cancel → cancelled
+  if(syll(v)>=2&&/[^aeiou][aeiou]l$/.test(v))return true;
+  // prefixed one-syllable roots: restop → restopping
+  for(const pre of ["re","un","over","out"]) if(v.startsWith(pre)&&v.length-pre.length>=3&&/^[^aeiou]+[aeiou][^aeiouwxy]$/.test(v.slice(pre.length)))return true;
   // one-syllable CVC, not ending w/x/y
   const m=v.match(/^[^aeiou]*[aeiou][^aeiouwxy]$/);
   return !!m && !/^(qu)/.test(v) ? true : /^qu[aeiou][^aeiouwxy]$/.test(v);
 }
 function ing(v){
   if(v==="be")return"being";
+  if(/[aeiou]c$/.test(v)&&syll(v)>=2)return v+"king"; // panic → panicking
   if(/ie$/.test(v))return v.slice(0,-2)+"ying";
   if(/[^e]e$/.test(v)&&!/(ee|ye|oe)$/.test(v))return v.slice(0,-1)+"ing";
   if(doubles(v))return v+v.slice(-1)+"ing";
@@ -91,6 +109,7 @@ function ing(v){
 }
 function ed(v){
   if(/e$/.test(v))return v+"d";
+  if(/[aeiou]c$/.test(v)&&syll(v)>=2)return v+"ked"; // panic → panicked
   if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+"ied";
   if(doubles(v))return v+v.slice(-1)+"ed";
   return v+"ed";
@@ -124,7 +143,7 @@ const FORMULA={
    "perfect continuous":["subject + will have been + base form + -ing","Ongoing up to a future moment."]}
 };
 function conj(v,s,t,a){
-  const P=irr[v]?irr[v].p:ed(v), PP=irr[v]?irr[v].pp:ed(v), G=ing(v);
+  const I=getIrr(v), P=I?I.p:ed(v), PP=I?I.pp:ed(v), G=ing(v);
   const has=third(s)?"has":"have";
   if(t==="past"){
     if(a==="simple") return v==="be"?be(s,"past"):P;
@@ -160,9 +179,9 @@ function render(){
     forms.innerHTML=""; note.textContent=v?"Use letters only, e.g. “swim”.":"Type a verb in its base form, e.g. “swim”.";
     return;
   }
-  const isIrr=!!irr[v];
-  forms.innerHTML=`<span>base <b>${v}</b></span><span>past (V2) <b>${isIrr?irr[v].p:ed(v)}</b></span><span>participle (V3) <b>${isIrr?irr[v].pp:ed(v)}</b></span><span>-ing <b>${ing(v)}</b></span>`;
-  note.innerHTML=isIrr?`<span class="hl">Irregular verb.</span> Learn its past forms by heart.`:"Regular verb: past forms add -ed. (If it's actually irregular and not in the list, the past forms may be wrong.)";
+  const I=getIrr(v), isIrr=!!I;
+  forms.innerHTML=`<span>base <b>${v}</b></span><span>past (V2) <b>${isIrr?I.p:ed(v)}</b></span><span>participle (V3) <b>${isIrr?I.pp:ed(v)}</b></span><span>-ing <b>${ing(v)}</b></span>`;
+  note.innerHTML=isIrr?`<span class="hl">Irregular verb.</span> Learn its past forms by heart.`:"Regular verb: past forms add -ed. Spelling follows British English (travelled, learnt).";
   grid.querySelectorAll(".cell").forEach(c=>{
     c.querySelector(".val").textContent=cap(s)+" "+conj(v,s,c.dataset.t,c.dataset.a);
   });
