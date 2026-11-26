@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Verb Tense Table</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a timeline running left→right (past · present · future), aspects stacked as rows */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --fg:#1a2130; --muted:#5d6779; --line:#d9dee7;
+  --past:#6b5bd2; --present:#0f8a6c; --future:#c2611b; --tip:#1a2130; --tipfg:#f3f5f8;
+  --display:"Fraunces",Georgia,serif; --body:"Inter",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161e; --surface:#1b212c; --fg:#e6e9ef; --muted:#9aa3b3; --line:#2c3442;
+  --past:#a395ff; --present:#3fd0a8; --future:#f29a55; --tip:#e6e9ef; --tipfg:#12161e; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12161e; --surface:#1b212c; --fg:#e6e9ef; --muted:#9aa3b3; --line:#2c3442;
+  --past:#a395ff; --present:#3fd0a8; --future:#f29a55; --tip:#e6e9ef; --tipfg:#12161e; color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1040px;margin:0 auto;padding-block:32px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:24px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(1.7rem,4vw,2.4rem);margin:0;text-wrap:balance}
+.lede{color:var(--muted);margin:4px 0 0;max-width:60ch}
+.entry{display:flex;flex-wrap:wrap;gap:12px;align-items:end}
+.field{display:grid;gap:4px}
+label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+#verb{font-family:var(--display);font-size:1.8rem;padding:10px 16px;border:2px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);width:min(320px,100%)}
+#verb:focus,#subj:focus{outline:none;border-color:var(--present)}
+#subj{font:inherit;padding:14px 12px;border:2px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg)}
+.forms{display:flex;flex-wrap:wrap;gap:8px 20px;font-family:var(--mono);font-size:.85rem;color:var(--muted)}
+.forms b{color:var(--fg);font-weight:500}
+.note{font-size:.85rem;color:var(--muted);min-height:1.3em;margin:0}
+.scroll{overflow-x:auto}
+.grid{display:grid;grid-template-columns:110px repeat(3,minmax(190px,1fr));gap:8px;min-width:680px}
+.head{font-family:var(--display);font-size:1.15rem;font-weight:700;padding:4px 12px;border-bottom:3px solid}
+.head small{display:block;font-family:var(--body);font-weight:400;font-size:.75rem;color:var(--muted)}
+.h-past{color:var(--past);border-color:var(--past)} .h-present{color:var(--present);border-color:var(--present)} .h-future{color:var(--future);border-color:var(--future)}
+.aspect{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;font-weight:600;color:var(--muted);align-self:center}
+.cell{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;cursor:help;min-height:72px;transition:border-color .15s}
+.cell .name{font-size:.72rem;color:var(--muted)}
+.cell .val{font-size:1.05rem;font-weight:500;margin-top:2px}
+.cell[data-t="past"]:hover,.cell[data-t="past"]:focus{border-color:var(--past)}
+.cell[data-t="present"]{border-width:2px}
+.cell[data-t="present"]:hover,.cell[data-t="present"]:focus{border-color:var(--present)}
+.cell[data-t="future"]:hover,.cell[data-t="future"]:focus{border-color:var(--future)}
+.cell:focus{outline:none}
+.tip{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);background:var(--tip);color:var(--tipfg);font-family:var(--mono);font-size:.78rem;padding:8px 10px;border-radius:6px;width:max-content;max-width:240px;opacity:0;pointer-events:none;transition:opacity .12s;z-index:5}
+.tip em{display:block;font-family:var(--body);font-style:normal;opacity:.75;margin-top:4px}
+.cell:hover .tip,.cell:focus .tip{opacity:1}
+.hl{color:var(--present);font-weight:600}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Verb Tense Table</h1>
+    <p class="lede">Type a verb and all twelve tenses fill in. Hover or tap a box to see how it's built.</p>
+  </header>
+  <div class="entry">
+    <div class="field"><label for="verb">Verb</label><input id="verb" value="write" autocomplete="off" spellcheck="false"></div>
+    <div class="field"><label for="subj">Subject</label>
+      <select id="subj"><option>I</option><option>you</option><option selected>she</option><option>he</option><option>it</option><option>we</option><option>they</option></select></div>
+  </div>
+  <div class="forms" id="forms"></div>
+  <p class="note" id="note"></p>
+  <div class="scroll"><div class="grid" id="grid"></div></div>
+</div>
+
+<script>
+const IRR = `arise arose arisen|awake awoke awoken|be was been|bear bore borne|beat beat beaten|become became become|begin began begun|bend bent bent|bet bet bet|bind bound bound|bite bit bitten|bleed bled bled|blow blew blown|break broke broken|breed bred bred|bring brought brought|build built built|burn burnt burnt|burst burst burst|buy bought bought|catch caught caught|choose chose chosen|cling clung clung|come came come|cost cost cost|creep crept crept|cut cut cut|deal dealt dealt|dig dug dug|do did done|draw drew drawn|dream dreamt dreamt|drink drank drunk|drive drove driven|eat ate eaten|fall fell fallen|feed fed fed|feel felt felt|fight fought fought|find found found|flee fled fled|fly flew flown|forbid forbade forbidden|forget forgot forgotten|forgive forgave forgiven|freeze froze frozen|get got got|give gave given|go went gone|grind ground ground|grow grew grown|hang hung hung|have had had|hear heard heard|hide hid hidden|hit hit hit|hold held held|hurt hurt hurt|keep kept kept|kneel knelt knelt|know knew known|lay laid laid|lead led led|lean leant leant|leap leapt leapt|learn learnt learnt|leave left left|lend lent lent|let let let|lie lay lain|light lit lit|lose lost lost|make made made|mean meant meant|meet met met|pay paid paid|prove proved proven|put put put|quit quit quit|read read read|ride rode ridden|ring rang rung|rise rose risen|run ran run|say said said|see saw seen|seek sought sought|sell sold sold|send sent sent|set set set|sew sewed sewn|shake shook shaken|shine shone shone|shoot shot shot|show showed shown|shrink shrank shrunk|shut shut shut|sing sang sung|sink sank sunk|sit sat sat|sleep slept slept|slide slid slid|speak spoke spoken|speed sped sped|spend spent spent|spin spun spun|spit spat spat|split split split|spread spread spread|spring sprang sprung|stand stood stood|steal stole stolen|stick stuck stuck|sting stung stung|stink stank stunk|stride strode stridden|strike struck struck|swear swore sworn|sweep swept swept|swim swam swum|swing swung swung|take took taken|teach taught taught|tear tore torn|tell told told|think thought thought|throw threw thrown|understand understood understood|wake woke woken|wear wore worn|weave wove woven|weep wept wept|win won won|wind wound wound|withdraw withdrew withdrawn|write wrote written`;
+const irr = {}; IRR.split("|").forEach(s=>{const [b,p,pp]=s.split(" ");irr[b]={p,pp}});
+// Common verbs that double the final consonant (stressed last syllable)
+const DOUBLE = new Set("admit commit control occur permit prefer refer regret submit transfer equip forget begin omit".split(" "));
+const V="aeiou";
+function doubles(v){
+  if(DOUBLE.has(v))return true;
+  // one-syllable CVC, not ending w/x/y
+  const m=v.match(/^[^aeiou]*[aeiou][^aeiouwxy]$/);
+  return !!m && !/^(qu)/.test(v) ? true : /^qu[aeiou][^aeiouwxy]$/.test(v);
+}
+function ing(v){
+  if(v==="be")return"being";
+  if(/ie$/.test(v))return v.slice(0,-2)+"ying";
+  if(/[^e]e$/.test(v)&&!/(ee|ye|oe)$/.test(v))return v.slice(0,-1)+"ing";
+  if(doubles(v))return v+v.slice(-1)+"ing";
+  return v+"ing";
+}
+function ed(v){
+  if(/e$/.test(v))return v+"d";
+  if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+"ied";
+  if(doubles(v))return v+v.slice(-1)+"ed";
+  return v+"ed";
+}
+function s3(v){
+  if(v==="have")return"has"; if(v==="be")return"is"; if(v==="do")return"does"; if(v==="go")return"goes";
+  if(/(s|sh|ch|x|z|o)$/.test(v))return v+"es";
+  if(/[^aeiou]y$/.test(v))return v.slice(0,-1)+"ies";
+  return v+"s";
+}
+const third = s=>["she","he","it"].includes(s);
+function be(s,t){
+  if(t==="past")return (s==="I"||third(s))?"was":"were";
+  return s==="I"?"am":third(s)?"is":"are";
+}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
+
+const TENSES=["past","present","future"], ASPECTS=["simple","continuous","perfect","perfect continuous"];
+const FORMULA={
+ past:{simple:["subject + past form (V2)","Finished action at a point in the past."],
+   continuous:["subject + was/were + base form + -ing","In progress at a moment in the past."],
+   perfect:["subject + had + past participle (V3)","Done before another past moment."],
+   "perfect continuous":["subject + had been + base form + -ing","Ongoing up to a past moment."]},
+ present:{simple:["subject + base form (+ -s for he/she/it)","Habits, facts, routines."],
+   continuous:["subject + am/is/are + base form + -ing","Happening right now."],
+   perfect:["subject + have/has + past participle (V3)","Past action linked to now."],
+   "perfect continuous":["subject + have/has been + base form + -ing","Started in the past, still going."]},
+ future:{simple:["subject + will + base form","A prediction or decision about later."],
+   continuous:["subject + will be + base form + -ing","In progress at a future moment."],
+   perfect:["subject + will have + past participle (V3)","Done before a future moment."],
+   "perfect continuous":["subject + will have been + base form + -ing","Ongoing up to a future moment."]}
+};
+function conj(v,s,t,a){
+  const P=irr[v]?irr[v].p:ed(v), PP=irr[v]?irr[v].pp:ed(v), G=ing(v);
+  const has=third(s)?"has":"have";
+  if(t==="past"){
+    if(a==="simple") return v==="be"?be(s,"past"):P;
+    if(a==="continuous") return be(s,"past")+" "+G;
+    if(a==="perfect") return "had "+PP;
+    return "had been "+G;
+  }
+  if(t==="present"){
+    if(a==="simple") return v==="be"?be(s,"present"):(third(s)?s3(v):v);
+    if(a==="continuous") return be(s,"present")+" "+G;
+    if(a==="perfect") return has+" "+PP;
+    return has+" been "+G;
+  }
+  if(a==="simple") return "will "+v;
+  if(a==="continuous") return "will be "+G;
+  if(a==="perfect") return "will have "+PP;
+  return "will have been "+G;
+}
+
+const grid=document.getElementById("grid");
+const LABEL={past:["Past","before now"],present:["Present","now"],future:["Future","after now"]};
+grid.innerHTML='<div></div>'+TENSES.map(t=>`<div class="head h-${t}">${LABEL[t][0]}<small>${LABEL[t][1]}</small></div>`).join("")+
+ ASPECTS.map(a=>`<div class="aspect">${a}</div>`+TENSES.map(t=>
+  `<div class="cell" tabindex="0" data-t="${t}" data-a="${a}"><div class="name">${cap(t)} ${a}</div><div class="val"></div><div class="tip">${FORMULA[t][a][0]}<em>${FORMULA[t][a][1]}</em></div></div>`).join("")).join("");
+
+const $v=document.getElementById("verb"),$s=document.getElementById("subj");
+function render(){
+  let v=$v.value.trim().toLowerCase().replace(/^to\s+/,"");
+  const s=$s.value, ok=/^[a-z]+$/.test(v);
+  const note=document.getElementById("note"), forms=document.getElementById("forms");
+  if(!ok){
+    grid.querySelectorAll(".val").forEach(e=>e.textContent="—");
+    forms.innerHTML=""; note.textContent=v?"Use letters only, e.g. “swim”.":"Type a verb in its base form, e.g. “swim”.";
+    return;
+  }
+  const isIrr=!!irr[v];
+  forms.innerHTML=`<span>base <b>${v}</b></span><span>past (V2) <b>${isIrr?irr[v].p:ed(v)}</b></span><span>participle (V3) <b>${isIrr?irr[v].pp:ed(v)}</b></span><span>-ing <b>${ing(v)}</b></span>`;
+  note.innerHTML=isIrr?`<span class="hl">Irregular verb.</span> Learn its past forms by heart.`:"Regular verb: past forms add -ed. (If it's actually irregular and not in the list, the past forms may be wrong.)";
+  grid.querySelectorAll(".cell").forEach(c=>{
+    c.querySelector(".val").textContent=cap(s)+" "+conj(v,s,c.dataset.t,c.dataset.a);
+  });
+}
+$v.addEventListener("input",render); $s.addEventListener("change",render);
+render();
+</script>
+
+</body>
+</html>
