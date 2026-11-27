@@ -476,7 +476,7 @@ html.reading{overflow:hidden}
   <div class="ctl"><label>Speed</label><div class="seg" id="sSpeed"><button data-v="0.8" type="button">0.8&times;</button><button data-v="1" type="button">1&times;</button><button data-v="1.25" type="button">1.25&times;</button><button data-v="1.5" type="button">1.5&times;</button></div></div>
   <div class="ctl"><label>Highlight spoken sentence</label><div class="seg" id="sHl"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
   <div class="ctl"><label>Highlight spoken word</label><div class="seg" id="sWh"><button data-v="true" type="button">On</button><button data-v="false" type="button">Off</button></div></div>
-    <p class="note">&ldquo;Read to me&rdquo; sends each sentence to your relay (address under Lookup), so nothing is downloaded and it starts quickly. Google voices sound the most natural and read any language. Cloudflare voices are lighter on the free allowance: the four narrators read English, and Standard (the lightest) also reads Spanish and French. Other languages need Google. The Browser option uses the voices built into your device and needs nothing. Speed also changes the pitch a little.</p>
+    <p class="note">&ldquo;Read to me&rdquo; sends each sentence to your relay (address under Lookup), so nothing is downloaded and it starts quickly. Google voices sound the most natural and read any language. Cloudflare's four narrators read English, and Standard also reads Spanish. Other languages need Google. The Browser option uses the voices built into your device and needs nothing. Speed also changes the pitch a little.</p>
   </section>
   <section class="aa">
   <h3>Lookup</h3>
@@ -1286,7 +1286,7 @@ const V={sents:[],idx:0,cur:null,open:false,playing:false,token:0,cancel:null,en
 const AC={ctx:null};
 const SP={gemini:false,needsCode:false};Object.assign(SP,store.get("marginalia.speechinfo",{}));
 // Four narrators per voice source: a younger and an older woman, a younger and an older man
-const STD={id:"std",name:"Standard",d:"plain voice, very light on the free allowance"};
+const STD={id:"std",name:"Standard",d:"plain voice"};
 const PERSONAS=[
   {id:"yw",name:"Younger woman",g:["Leda","youthful"],a:["luna","friendly"]},
   {id:"ow",name:"Older woman",g:["Gacrux","mature"],a:["hera","smooth, warm"]},
@@ -1314,10 +1314,10 @@ function fillVoiceSelect(){
     const src=srcOf();
     $("vSrcRow").hidden=!SP.gemini;
     $("vSrc").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===src)));
-    $("vSrcNote").textContent=src==="google"?"The most natural voices. They read any language and use your Google allowance.":"Quick and light on the free allowance. The four narrators read English; Standard also reads Spanish and French.";
+    $("vSrcNote").textContent=src==="google"?"The most natural voices. They read any language and use your Google allowance.":"Quick, and runs on the Cloudflare allowance. The four narrators read English; Standard also reads Spanish.";
     const box=$("vPers");box.textContent="";
     if(src==="cf"){const b=document.createElement("button");b.type="button";b.className="wide";b.dataset.v="std";b.setAttribute("aria-pressed",String(prefs.persona==="std"));
-      const n=document.createElement("b");n.textContent=STD.name;const d=document.createElement("span");d.textContent=STD.d+"; also reads Spanish and French";b.append(n,d);box.append(b)}
+      const n=document.createElement("b");n.textContent=STD.name;const d=document.createElement("span");d.textContent=STD.d+"; also reads Spanish";b.append(n,d);box.append(b)}
     PERSONAS.forEach(p=>{const b=document.createElement("button");b.type="button";b.dataset.v=p.id;b.setAttribute("aria-pressed",String(p.id===personaOf().id&&!(src==="cf"&&prefs.persona==="std")));
       const n=document.createElement("b");n.textContent=p.name;const d=document.createElement("span");d.textContent=(src==="google"?p.g[0]:p.a[0][0].toUpperCase()+p.a[0].slice(1))+", "+(src==="google"?p.g[1]:p.a[1]);
       b.append(n,d);box.append(b)});
@@ -1413,7 +1413,7 @@ function ensureCtx(){
   if(!AC.ctx){try{AC.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){AC.ctx=null}}
   if(AC.ctx&&AC.ctx.state==="suspended")AC.ctx.resume().catch(()=>{});
 }
-/* Which language is the book in? The fast voice reads English, Spanish and French, so it needs to know. */
+/* Which language is the book in? The fast voice reads English and Spanish, so it needs to know. */
 const LANG_WORDS={
   en:"the and of to a in that was it he she her his with you for had not but is as at on be this which they were have from by",
   es:"el la de que y en los las un una por con no se su del al lo como más pero le es para sus fue ha me si",
@@ -1428,7 +1428,7 @@ const LANG_WORDS={
 };
 const LANG_NAME={en:"English",es:"Spanish",fr:"French",sv:"Swedish",de:"German",it:"Italian",pt:"Portuguese",nl:"Dutch",da:"Danish or Norwegian",fi:"Finnish"};
 const LANG_SETS=Object.fromEntries(Object.entries(LANG_WORDS).map(([k,v])=>[k,new Set(v.split(" "))]));
-const FAST_LANGS=["en","es","fr"];
+const FAST_LANGS=["en","es"];   // languages the Cloudflare Standard voice (Aura-2) can read; Google reads any language
 function detectLang(text){
   const letters=text.replace(/[^\p{L}]/gu,"");if(letters.length<40)return "en";
   const share=re=>(letters.match(re)||[]).length/letters.length;
@@ -1449,7 +1449,7 @@ function bookLang(){
   }
   return {code,name:LANG_NAME[code]||"this language",ok:FAST_LANGS.includes(code)};
 }
-// can the chosen voice source read this book? Google reads any language; Cloudflare: Aura is English, the plainer Melo voice adds Spanish and French
+// can the chosen voice source read this book? Google reads any language; Cloudflare: the four narrators are English, Standard adds Spanish
 function clCanRead(){const l=bookLang(),v=clVoice();return v.startsWith("gemini:")?true:v==="melo"?l.ok:true}   // Google voices detect the language themselves
 /* Fast voice: sentences are spoken by Cloudflare through the relay and played from the downloaded mp3 */
 const CL={cache:new Map()};
