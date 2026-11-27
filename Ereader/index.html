@@ -1028,8 +1028,8 @@ function feedGo(i,instant,user){
   i=Math.max(0,Math.min(FEED.n-1,i));const box=$("feed");FEED.H=box.clientHeight;
   FEED.idx=i;feedNear(i);FEED.prog=true;
   box.scrollTo({top:i*FEED.H,behavior:instant?"instant":"smooth"});
-  if(instant||user)feedAfter(i,!!user);
-  clearTimeout(FEED.st);FEED.st=setTimeout(()=>{FEED.prog=false;feedAfter(FEED.idx,false)},instant?60:520);
+  feedAfter(i,!!user);   // set "cur" (and its entrance animation) right away, in step with the fill above, not after the scroll has already settled
+  clearTimeout(FEED.st);FEED.st=setTimeout(()=>{FEED.prog=false},instant?60:520);
 }
 function feedStep(d){
   const j=FEED.idx+d;
